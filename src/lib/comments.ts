@@ -195,6 +195,7 @@ interface CommentQueryUser {
     customDescription?: string | null
     type: {
       id: string
+      slug?: string | null
       name: string
       color: string
       iconText?: string | null
@@ -237,6 +238,7 @@ function mapVerification(user: CommentQueryUser) {
 
   return {
     id: item.type.id,
+    slug: item.type.slug,
     name: item.type.name,
     color: item.type.color,
     iconText: item.type.iconText,

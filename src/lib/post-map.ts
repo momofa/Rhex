@@ -41,6 +41,7 @@ interface ListPostAuthor extends VipStateSource {
     customDescription?: string | null
     type: {
       id: string
+      slug?: string | null
       name: string
       color: string
       iconText?: string | null
@@ -148,6 +149,7 @@ export function mapListPost(post: ListPostSource, anonymousMaskIdentity: Anonymo
     authorVerification: post.author.verificationApplications?.[0]
       ? {
           id: post.author.verificationApplications[0].type.id,
+          slug: post.author.verificationApplications[0].type.slug,
           name: post.author.verificationApplications[0].type.name,
           color: post.author.verificationApplications[0].type.color,
           iconText: post.author.verificationApplications[0].type.iconText,

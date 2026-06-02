@@ -337,6 +337,18 @@ const writeGuardConfig = {
       parts: ["userId", "requestId"],
     },
   },
+  "verification-application-submit": {
+    description: "认证申请防重，避免连点造成重复申请和重复扣积分。",
+    scope: "verification-application-submit",
+    cooldownMs: 1_500,
+    cooldownMessage: "认证申请提交过于频繁，请稍后再试",
+    releaseOnError: true,
+    dedupe: {
+      windowMs: 10_000,
+      parts: ["userId", "verificationTypeId", "content", "customIconText", "customDescription", "formResponse"],
+      separator: "|",
+    },
+  },
 } satisfies WriteGuardPolicyConfigMap
 
 export default writeGuardConfig

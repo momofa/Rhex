@@ -16,6 +16,7 @@ export const BadgeRuleType = {
   CURRENT_CHECK_IN_STREAK: "CURRENT_CHECK_IN_STREAK",
   MAX_CHECK_IN_STREAK: "MAX_CHECK_IN_STREAK",
   VIP_LEVEL: "VIP_LEVEL",
+  VERIFICATION_TYPE: "VERIFICATION_TYPE",
 } as const
 
 export type BadgeRuleType = (typeof BadgeRuleType)[keyof typeof BadgeRuleType]

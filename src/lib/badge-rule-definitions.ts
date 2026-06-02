@@ -1,6 +1,6 @@
 import { BadgeRuleType } from "@/lib/shared/badge-rule-enums"
 
-export type BadgeRuleValueMode = "number" | "text" | "user-level" | "vip-level" | "datetime-local"
+export type BadgeRuleValueMode = "number" | "text" | "user-level" | "vip-level" | "datetime-local" | "verification-type"
 
 export type BadgeRuleTypeValue = BadgeRuleType
 
@@ -29,6 +29,7 @@ export const BADGE_RULE_TYPE_OPTIONS: BadgeRuleTypeOption[] = [
   { value: BadgeRuleType.CURRENT_CHECK_IN_STREAK, label: "连续签到天数", placeholder: "如 7", valueMode: "number" },
   { value: BadgeRuleType.MAX_CHECK_IN_STREAK, label: "最高连续签到天数", placeholder: "如 30", valueMode: "number" },
   { value: BadgeRuleType.VIP_LEVEL, label: "VIP 等级", placeholder: "选择 VIP 等级", valueMode: "vip-level" },
+  { value: BadgeRuleType.VERIFICATION_TYPE, label: "指定认证", placeholder: "选择认证类型", valueMode: "verification-type" },
 ]
 
 const BADGE_RULE_TYPE_VALUE_SET = new Set<string>(BADGE_RULE_TYPE_OPTIONS.map((item) => item.value))

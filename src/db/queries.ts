@@ -59,6 +59,7 @@ export const postListInclude = {
           type: {
             select: {
               id: true,
+              slug: true,
               name: true,
               color: true,
               iconText: true,

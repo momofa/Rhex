@@ -37,6 +37,7 @@ export function createVerificationTypeRecord(data: {
   iconText: string
   color: string
   formSchemaJson?: string
+  pointsCost: number
   sortOrder: number
   status: boolean
   needRemark: boolean
@@ -65,6 +66,7 @@ export function updateVerificationTypeRecord(id: string, data: {
   iconText: string
   color: string
   formSchemaJson?: string
+  pointsCost: number
   sortOrder: number
   status: boolean
   needRemark: boolean

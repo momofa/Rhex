@@ -17,7 +17,7 @@ import { getPublicPostContentText } from "@/lib/post-content"
 import { resolvePostHeatStyle } from "@/lib/post-heat"
 import { resolvePostListPreviewMedia } from "@/lib/post-list-media"
 import { buildPostListPreviewContent } from "@/lib/post-list-preview-content"
-import { getPostTypeLabel, PUBLIC_READABLE_POST_STATUSES } from "@/lib/post-types"
+import { getPostStatusLabel, getPostTypeLabel } from "@/lib/post-types"
 import { parsePostRewardPoolConfigFromContent } from "@/lib/post-red-packets"
 import type { SitePostItem } from "@/lib/posts"
 import { getSiteSettings } from "@/lib/site-settings"
@@ -104,7 +104,7 @@ async function resolveHookedFeedPosts(
 
   const queried = await queryAddonPosts({
     ids: uniquePostIds,
-    statuses: [...PUBLIC_READABLE_POST_STATUSES],
+    statuses: ["NORMAL", "LOCKED", "PENDING", "OFFLINE"],
     includeTotal: false,
     limit: uniquePostIds.length,
   })
@@ -202,6 +202,9 @@ export async function buildHookedFeedDisplayItems(input: {
       title: post.title,
       type: post.type,
       typeLabel: legacy?.typeLabel ?? getPostTypeLabel(post.type),
+      status: post.status,
+      statusLabel: legacy?.statusLabel ?? getPostStatusLabel(post.status),
+      reviewNote: legacy?.reviewNote ?? post.reviewNote ?? null,
       pinScope: post.pinScope,
       pinLabel: getFeedPinLabel(post.pinScope),
       hasRedPacket: legacy?.hasRedPacket ?? Boolean(rewardConfig),
@@ -328,6 +331,9 @@ export async function buildHookedPostStreamDisplayItems(input: {
       previewMedia,
       type: post.type,
       typeLabel: legacy?.typeLabel ?? getPostTypeLabel(post.type),
+      status: post.status,
+      statusLabel: legacy?.statusLabel ?? getPostStatusLabel(post.status),
+      reviewNote: legacy?.reviewNote ?? post.reviewNote ?? null,
       pinScope: post.pinScope,
       pinLabel: getVisiblePinLabel(post.pinScope, input.visiblePinScopes),
       hasRedPacket: legacy?.hasRedPacket ?? Boolean(rewardConfig),

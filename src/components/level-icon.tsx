@@ -89,6 +89,19 @@ export function LevelIcon({ icon, color, className, svgClassName, emojiClassName
     )
   }
 
+  if (normalizedIcon.startsWith("<") || normalizedIcon.includes("<svg")) {
+    return (
+      <span
+        title={title}
+        aria-label={title}
+        className={cn("inline-flex shrink-0 items-center justify-center leading-none", className, emojiClassName)}
+        style={color ? { color } : undefined}
+      >
+        ⭐
+      </span>
+    )
+  }
+
   return (
     <span
       title={title}

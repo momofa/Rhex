@@ -54,7 +54,8 @@ export const adminPostActionHandlers: Record<string, AdminActionDefinition> = {
   "post.hide": defineAdminAction({ targetType: "POST", revalidatePaths: ["/", "/admin"], buildDetail: () => "管理员下线帖子" }, async (context) => {
     const post = await ensureCanManagePost(context.actor, context.targetId)
     const previousStatus = post.status as AddonReadablePostStatus
-    await updatePostStatus(context.targetId, PostStatus.OFFLINE)
+    const reason = context.message || "管理员下线帖子"
+    await updatePostStatus(context.targetId, PostStatus.OFFLINE, reason)
     revalidateHomeSidebarStatsCache()
     revalidatePostDetailCache({ postId: post.id, slug: post.slug })
     expireTaxonomyCacheImmediately()
@@ -64,6 +65,20 @@ export const adminPostActionHandlers: Record<string, AdminActionDefinition> = {
       previousStatus,
       nextStatus: "OFFLINE",
     })
+
+    if (post.authorId !== context.adminUserId) {
+      void createSystemNotification({
+        userId: post.authorId,
+        senderId: context.adminUserId,
+        relatedType: "POST",
+        relatedId: post.id,
+        title: "帖子已被下线",
+        content: `你的帖子《${post.title}》已被管理员下线。下线原因：${reason}`,
+      }).catch((error) => {
+        console.warn("[admin-post-actions] failed to notify post hidden", error)
+      })
+    }
+
     await writeAdminActionLog(context, adminPostActionHandlers["post.hide"].metadata)
     return { message: "帖子已下线" }
   }),
@@ -211,8 +226,11 @@ export const adminPostActionHandlers: Record<string, AdminActionDefinition> = {
   }),
   "post.reject": defineAdminAction({ targetType: "POST", revalidatePaths: ["/", "/admin"], buildDetail: () => "管理员驳回帖子审核" }, async (context) => {
     const post = await ensureCanManagePost(context.actor, context.targetId)
+    if (!context.message) {
+      apiError(400, "请填写驳回原因")
+    }
     const previousStatus = post.status as AddonReadablePostStatus
-    await updatePostStatus(context.targetId, PostStatus.OFFLINE, context.message || "审核未通过")
+    await updatePostStatus(context.targetId, PostStatus.OFFLINE, context.message)
     revalidateHomeSidebarStatsCache()
     revalidatePostDetailCache({ postId: post.id, slug: post.slug })
     expireTaxonomyCacheImmediately()

@@ -35,6 +35,7 @@ export interface BadgeEligibilitySnapshot {
   currentCheckInStreak: number
   maxCheckInStreak: number
   vipLevel: number
+  approvedVerificationTypeIds: string[]
 }
 
 const RULE_LABELS: Record<string, string> = {
@@ -55,6 +56,7 @@ const RULE_LABELS: Record<string, string> = {
   CURRENT_CHECK_IN_STREAK: "连续签到天数",
   MAX_CHECK_IN_STREAK: "最高连续签到天数",
   VIP_LEVEL: "VIP 等级",
+  VERIFICATION_TYPE: "指定认证",
 }
 
 function toNonNegativeInt(value: string | number | null | undefined) {
@@ -103,6 +105,10 @@ function describeNumberRule(rule: BadgeRuleItem) {
 }
 
 export function describeBadgeRule(rule: BadgeRuleItem) {
+  if (rule.ruleType === BadgeRuleType.VERIFICATION_TYPE) {
+    return rule.extraValue ? `拥有认证「${rule.extraValue}」` : "拥有指定认证"
+  }
+
   if (rule.ruleType === BadgeRuleType.REGISTER_TIME_RANGE) {
     const start = normalizeDate(rule.value)
     const end = normalizeDate(rule.extraValue ?? null)
@@ -138,6 +144,10 @@ export function describeBadgeRules(rules: BadgeRuleItem[]) {
 }
 
 export function evaluateBadgeRuleForSnapshot(snapshot: BadgeEligibilitySnapshot, rule: BadgeRuleItem) {
+  if (rule.ruleType === BadgeRuleType.VERIFICATION_TYPE) {
+    return rule.operator === BadgeRuleOperator.EQ && snapshot.approvedVerificationTypeIds.includes(rule.value)
+  }
+
   const numberMap: Partial<Record<BadgeRuleTypeValue, number>> = {
     REGISTER_DAYS: snapshot.registerDays,
     POST_COUNT: snapshot.postCount,

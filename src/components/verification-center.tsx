@@ -7,7 +7,7 @@ import { LevelIcon } from "@/components/level-icon"
 import { Button } from "@/components/ui/rbutton"
 import { showConfirm } from "@/components/ui/alert-dialog"
 import { IconPicker } from "@/components/ui/icon-picker"
-import { formatDateTime } from "@/lib/formatters"
+import { formatDateTime, formatNumber } from "@/lib/formatters"
 import { describeIconSource } from "@/lib/icon-source"
 import type { VerificationFormField } from "@/lib/verification-form-schema"
 
@@ -43,6 +43,7 @@ type VerificationTypeItem = {
   sortOrder: number
   status: boolean
   userLimit: number
+  pointsCost: number
   allowResubmitAfterReject: boolean
   formFields: VerificationFormField[]
   currentApplication?: VerificationApplicationItem | null
@@ -61,6 +62,7 @@ type ApprovedVerificationItem = {
 interface VerificationCenterProps {
   types: VerificationTypeItem[]
   approvedVerification?: ApprovedVerificationItem | null
+  pointName?: string
 }
 
 function getInitialDraft(type: VerificationTypeItem | null, approvedVerification?: ApprovedVerificationItem | null) {
@@ -90,9 +92,21 @@ function getInitialDraft(type: VerificationTypeItem | null, approvedVerification
   }
 }
 
-export function VerificationCenter({ types, approvedVerification }: VerificationCenterProps) {
-  const [selectedTypeId, setSelectedTypeId] = useState(types[0]?.id ?? "")
-  const initialDraft = getInitialDraft(types[0] ?? null, approvedVerification)
+function getInitialSelectedType(types: VerificationTypeItem[], approvedVerification?: ApprovedVerificationItem | null) {
+  if (approvedVerification) {
+    const approvedType = types.find((item) => item.id === approvedVerification.id)
+    if (approvedType) {
+      return approvedType
+    }
+  }
+
+  return types[0] ?? null
+}
+
+export function VerificationCenter({ types, approvedVerification, pointName = "积分" }: VerificationCenterProps) {
+  const initialSelectedType = getInitialSelectedType(types, approvedVerification)
+  const [selectedTypeId, setSelectedTypeId] = useState(initialSelectedType?.id ?? "")
+  const initialDraft = getInitialDraft(initialSelectedType, approvedVerification)
   const [content, setContent] = useState(initialDraft.content)
   const [customIconText, setCustomIconText] = useState(initialDraft.customIconText)
   const [customDescription, setCustomDescription] = useState(initialDraft.customDescription)
@@ -126,9 +140,21 @@ export function VerificationCenter({ types, approvedVerification }: Verification
     }))
   }
 
-  function submit() {
+  async function submit() {
     if (!selectedType) {
       return
+    }
+
+    if (!showCustomizationForm && selectedType.pointsCost > 0) {
+      const confirmed = await showConfirm({
+        title: "提交认证申请",
+        description: `提交 ${selectedType.name} 认证申请将扣除 ${formatNumber(selectedType.pointsCost)} ${pointName}，审核未通过不会自动退回。`,
+        confirmText: "确认提交",
+      })
+
+      if (!confirmed) {
+        return
+      }
     }
 
     setFeedback("")
@@ -249,6 +275,11 @@ export function VerificationCenter({ types, approvedVerification }: Verification
                           {hasReviewTrail ? renderStatusPill(item.currentApplication?.status) : null}
                         </div>
                         <p className="mt-1 text-xs leading-6 text-muted-foreground line-clamp-2">{item.description || "暂无说明"}</p>
+                        {!isApprovedType ? (
+                          <p className="mt-2 text-xs font-medium text-foreground">
+                            {item.pointsCost > 0 ? `申请消耗 ${formatNumber(item.pointsCost)} ${pointName}` : "免费申请"}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
                   </button>
@@ -270,6 +301,11 @@ export function VerificationCenter({ types, approvedVerification }: Verification
                 <div className="min-w-0">
                   <h2 className="break-words text-lg font-semibold [overflow-wrap:anywhere] sm:text-xl">{showCustomizationForm || showApprovedPendingState ? `定制 ${selectedType.name}` : `申请 ${selectedType.name}`}</h2>
                   <p className="mt-1 text-sm leading-7 text-muted-foreground">{selectedType.description || "请填写你的认证材料，后台会尽快审核。"}</p>
+                  {!showCustomizationForm && !showApprovedPendingState ? (
+                    <p className="mt-1 text-sm font-medium">
+                      {selectedType.pointsCost > 0 ? `提交时扣除 ${formatNumber(selectedType.pointsCost)} ${pointName}` : "提交申请不消耗积分"}
+                    </p>
+                  ) : null}
                 </div>
               </div>
 
@@ -436,7 +472,11 @@ export function VerificationCenter({ types, approvedVerification }: Verification
                   </label>
 
                   <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-xs leading-6 text-muted-foreground">建议填写真实身份说明、业务介绍、可核验链接或其它辅助材料，便于后台快速审核。</p>
+                    <p className="text-xs leading-6 text-muted-foreground">
+                      {selectedType.pointsCost > 0
+                        ? `建议填写真实身份说明、业务介绍、可核验链接或其它辅助材料；提交后会立即扣除 ${formatNumber(selectedType.pointsCost)} ${pointName}。`
+                        : "建议填写真实身份说明、业务介绍、可核验链接或其它辅助材料，便于后台快速审核。"}
+                    </p>
                     <Button type="button" disabled={isPending || currentApplication?.status === "PENDING"} onClick={submit} className="w-full rounded-full px-5 sm:w-auto">
                       {isPending ? "提交中..." : currentApplication?.status === "PENDING" ? "审核中" : currentApplication?.status === "REJECTED" ? "重新提交申请" : "提交申请"}
                     </Button>

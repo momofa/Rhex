@@ -178,8 +178,9 @@ export function PostTableOfContents({ items }: PostTableOfContentsProps) {
                   }}
                   href={`#${item.id}`}
                   aria-current={isActive ? "location" : undefined}
+                  title={item.text}
                   className={cn(
-                    "block rounded-lg py-2 pr-3 text-[13px] leading-5 text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground",
+                    "block w-full min-w-0 truncate rounded-lg py-2 pr-3 text-[13px] leading-5 text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground",
                     isActive && "bg-accent text-foreground",
                   )}
                   style={{ paddingLeft: `${TOC_BASE_INDENT + indentLevel * TOC_INDENT_STEP}px` }}

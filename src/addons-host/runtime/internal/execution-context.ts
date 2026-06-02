@@ -11,6 +11,8 @@
 
 import { promises as fs } from "node:fs"
 
+import type { PrismaClient } from "@prisma/client"
+
 import {
   normalizeMountedAddonPath,
   readJsonFile,
@@ -49,6 +51,7 @@ export function buildAddonExecutionContext(addon: LoadedAddonRuntime, input?: {
   request?: Request
   pathname?: string
   searchParams?: URLSearchParams
+  databaseClient?: PrismaClient
 }): AddonExecutionContextBase {
   const permissionSet = addon.permissionSet
   let currentUserPromise: ReturnType<typeof getSessionActorFromRequest> | undefined
@@ -76,7 +79,7 @@ export function buildAddonExecutionContext(addon: LoadedAddonRuntime, input?: {
       )
     }
   }
-  const database = buildAddonDatabaseApi(addon, assertRuntimePermission, prisma)
+  const database = buildAddonDatabaseApi(addon, assertRuntimePermission, input?.databaseClient ?? prisma)
 
   return {
     manifest: addon.manifest,

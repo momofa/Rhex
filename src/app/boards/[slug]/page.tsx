@@ -27,6 +27,7 @@ import { buildMetadataKeywords } from "@/lib/seo"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getZones } from "@/lib/zones"
 import { ForumPostStreamView } from "@/components/forum/forum-post-stream-view"
+import { resolveAdminActorFromSessionUser } from "@/lib/moderator-permissions"
 
 export const dynamic = "force-dynamic"
 
@@ -129,9 +130,13 @@ export default async function BoardPage(props: PageProps<"/boards/[slug]">) {
   const rawSort = readSearchParam(searchParams?.sort)
   const currentPage = Math.max(1, Number(rawPage ?? "1") || 1)
   const currentSort = normalizeTaxonomyPostSort(rawSort)
+  const postListViewer = {
+    userId: currentUser?.id ?? null,
+    adminActor: await resolveAdminActorFromSessionUser(currentUser),
+  }
   const [postsPage, boards, zones, hotTopics, announcements, moderators] = await Promise.all([
     permission.allowed
-      ? getBoardPosts(params.slug, currentPage, settings.boardPostPageSize, currentSort)
+      ? getBoardPosts(params.slug, currentPage, settings.boardPostPageSize, currentSort, postListViewer)
       : Promise.resolve({ items: [], page: 1, pageSize: settings.boardPostPageSize, total: 0, totalPages: 1, hasPrevPage: false, hasNextPage: false }),
     getBoards(),
     getZones(),

@@ -22,7 +22,7 @@ import { AdminUserList } from "@/components/admin/admin-user-list"
 import { getAdminComments, getAdminDashboardData, getAdminPosts, getAdminStructureData } from "@/lib/admin"
 import { getAdminAnnouncementList } from "@/lib/admin-announcements"
 import { getAdminCustomPageList } from "@/lib/admin-custom-pages"
-import { getVerificationAdminData } from "@/lib/admin-verification-service"
+import { getVerificationAdminData, getVerificationTypeOptions } from "@/lib/admin-verification-service"
 import {
   adminTabs,
   adminTabLabels,
@@ -145,7 +145,7 @@ export default async function AdminPage(props: PageProps<"/admin">) {
   const currentAttachmentPage = readSearchParam(searchParams?.attachmentPage) ?? "1"
   const currentAttachmentPageSize = readSearchParam(searchParams?.attachmentPageSize) ?? "20"
 
-  const [dashboardData, structureData, adminUsers, filteredPosts, filteredComments, adminMessages, levelDefinitions, badges, announcements, customPages, reports, attachments, sensitiveWordResult, logCenter, verificationAdminData] = await Promise.all([
+  const [dashboardData, structureData, adminUsers, filteredPosts, filteredComments, adminMessages, levelDefinitions, badges, badgeVerificationTypes, announcements, customPages, reports, attachments, sensitiveWordResult, logCenter, verificationAdminData] = await Promise.all([
     admin.role === "ADMIN" && tab === "overview"
       ? getAdminDashboardData()
       : Promise.resolve<Awaited<ReturnType<typeof getAdminDashboardData>> | null>(null),
@@ -201,10 +201,11 @@ export default async function AdminPage(props: PageProps<"/admin">) {
         conversationId: currentMessageConversationId || undefined,
       })
       : Promise.resolve<Awaited<ReturnType<typeof getAdminMessages>> | null>(null),
-    admin.role === "ADMIN" && tab === "levels"
+    admin.role === "ADMIN" && (tab === "levels" || tab === "badges")
       ? getLevelDefinitions()
       : Promise.resolve<Awaited<ReturnType<typeof getLevelDefinitions>>>([]),
     admin.role === "ADMIN" && tab === "badges" ? getAllBadges() : Promise.resolve<Awaited<ReturnType<typeof getAllBadges>>>([]),
+    admin.role === "ADMIN" && tab === "badges" ? getVerificationTypeOptions() : Promise.resolve<Awaited<ReturnType<typeof getVerificationTypeOptions>>>([]),
     admin.role === "ADMIN" && tab === "announcements" ? getAdminAnnouncementList() : Promise.resolve<Awaited<ReturnType<typeof getAdminAnnouncementList>>>([]),
     admin.role === "ADMIN" && tab === "custom-pages" ? getAdminCustomPageList() : Promise.resolve<Awaited<ReturnType<typeof getAdminCustomPageList>>>([]),
     admin.role === "ADMIN" && tab === "reports"
@@ -269,7 +270,7 @@ export default async function AdminPage(props: PageProps<"/admin">) {
         {tab === "structure" ? <StructureManager zones={structureData!.zones} boards={structureData!.boardStatus} permissions={structureData!.permissions} canReviewBoardApplications={structureData!.canReviewBoardApplications} pendingBoardApplicationCount={structureData!.boardApplications.filter((item) => item.status === "PENDING").length} verificationTypes={structureData!.verificationTypes} badges={structureData!.badges} initialFilters={{ keyword: currentStructureKeyword, zoneId: currentStructureZoneId, boardStatus: currentStructureBoardStatus, posting: currentStructurePosting }} /> : null}
         {tab === "board-applications" ? <AdminBoardApplicationManager zones={structureData!.zones} boardApplications={structureData!.boardApplications} canReviewBoardApplications={structureData!.canReviewBoardApplications} /> : null}
         {tab === "levels" ? <AdminLevelSettingsForm initialLevels={levelDefinitions} /> : null}
-        {tab === "badges" ? <AdminBadgeManager initialLevelDefinitions={levelDefinitions} initialBadges={badges.map((badge: BadgeItem) => ({
+        {tab === "badges" ? <AdminBadgeManager initialLevelDefinitions={levelDefinitions} initialVerificationTypes={badgeVerificationTypes} initialBadges={badges.map((badge: BadgeItem) => ({
           id: badge.id,
           name: badge.name,
           code: badge.code,

@@ -127,6 +127,7 @@ function normalizeVerificationBadgeValue(
 
   return {
     id,
+    slug: normalizePresentationText(record.slug, 64) ?? fallback?.slug ?? null,
     name,
     color,
     iconText: normalizePublicUserIconText(record.iconText) ?? fallback?.iconText ?? null,

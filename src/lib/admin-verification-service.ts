@@ -36,6 +36,7 @@ function buildVerificationTypeWriteInput(body: JsonObject) {
     iconText: normalizeText(body.iconText, "✔️") || "✔️",
     color: normalizeText(body.color, "#2563eb") || "#2563eb",
     formSchemaJson: typeof body.formSchemaJson === "string" ? body.formSchemaJson : undefined,
+    pointsCost: Math.max(0, Math.floor(normalizeNumber(body.pointsCost))),
     sortOrder: normalizeNumber(body.sortOrder),
     status: body.status === undefined ? true : normalizeBoolean(body.status),
     needRemark: normalizeBoolean(body.needRemark),
@@ -81,6 +82,7 @@ export async function getVerificationAdminData() {
         allowFallbackLabel: true,
         coerceInvalidType: true,
       }),
+      pointsCost: type.pointsCost,
       sortOrder: type.sortOrder,
       status: type.status,
       needRemark: type.needRemark,
@@ -123,6 +125,17 @@ export async function getVerificationAdminData() {
         : null,
     })),
   }
+}
+
+export async function getVerificationTypeOptions() {
+  const types = await findAdminVerificationTypes()
+
+  return types.map((type) => ({
+    id: type.id,
+    name: type.name,
+    iconText: type.iconText ?? "✔️",
+    status: type.status,
+  }))
 }
 
 export async function createVerificationType(params: {

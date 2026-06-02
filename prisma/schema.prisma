@@ -290,6 +290,7 @@ enum BadgeRuleType {
   CURRENT_CHECK_IN_STREAK
   MAX_CHECK_IN_STREAK
   VIP_LEVEL
+  VERIFICATION_TYPE
 }
 
 enum BadgeRuleOperator {
@@ -1548,6 +1549,7 @@ model VerificationType {
   iconText                 String?            @default("✔️")
   color                    String             @default("#2563eb")
   formSchemaJson           String?
+  pointsCost               Int                @default(0)
   sortOrder                Int                @default(0)
   status                   Boolean            @default(true)
   needRemark               Boolean            @default(true)

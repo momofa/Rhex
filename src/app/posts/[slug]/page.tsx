@@ -183,6 +183,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
   const isOwnerOrSiteAdmin = Boolean(isPostOwner || isSiteAdmin)
   const canViewPendingPost = basePost.status === "PENDING" && isOwnerOrManager
   const canViewOfflinePost = basePost.status === "OFFLINE" && isOwnerOrManager
+  const canViewModeratedPost = canViewPendingPost || canViewOfflinePost
 
   const viewPermission = boardAccessContext ? checkBoardPermission(currentUser, boardAccessContext.settings, "view") : { allowed: true, message: "" }
   const replyPermission = boardAccessContext ? checkBoardPermission(currentUser, boardAccessContext.settings, "reply") : { allowed: true, message: "" }
@@ -191,13 +192,9 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
   const canViewPublicPost = isPublicReadablePostStatus(basePost.status)
   const canReplyToPost = isPostOpenForReplies(basePost.status)
   const canViewRestrictedPost = canViewPublicPost && (mergedViewPermission.allowed || isOwnerOrManager)
-  const shouldRenderOfflineNotice = basePost.status === "OFFLINE" && !canViewOfflinePost
+  const canViewPostContent = canViewRestrictedPost || canViewModeratedPost
 
-  if (basePost.status === "PENDING" && !canViewPendingPost) {
-    notFound()
-  }
-
-  if (!isPublicReadablePostStatus(basePost.status) && basePost.status !== "PENDING" && basePost.status !== "OFFLINE" && !isOwnerOrManager) {
+  if (!canViewPublicPost && !canViewModeratedPost) {
     notFound()
   }
 
@@ -205,7 +202,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
   const postPageQueryString = postPageSearchParams.toString()
   const postAuthRedirectTarget = `${canonicalPath}${postPageQueryString ? `?${postPageQueryString}` : ""}`
 
-  const userReplyCountPromise = canViewRestrictedPost ? getUserReplyCountByPost(basePost.id, currentUser?.id) : Promise.resolve(0)
+  const userReplyCountPromise = canViewPostContent ? getUserReplyCountByPost(basePost.id, currentUser?.id) : Promise.resolve(0)
   const canViewComments = Boolean(currentUser) || settings.guestCanViewComments
   const canReplyAsAnonymous = Boolean(
     currentUser
@@ -219,12 +216,12 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
     }),
   )
 
-  const purchasedBlockIdsPromise = canViewRestrictedPost ? getPurchasedPostBlockIds(basePost.id, currentUser?.id) : Promise.resolve(new Set<string>())
-  const purchasedAttachmentIdsPromise = canViewRestrictedPost ? getPurchasedPostAttachmentIds(basePost.id, currentUser?.id) : Promise.resolve(new Set<string>())
-  const purchasedBlockBuyerCountsPromise = canViewRestrictedPost ? getPurchasedPostBlockBuyerCounts(basePost.id) : Promise.resolve(new Map<string, number>())
+  const purchasedBlockIdsPromise = canViewPostContent ? getPurchasedPostBlockIds(basePost.id, currentUser?.id) : Promise.resolve(new Set<string>())
+  const purchasedAttachmentIdsPromise = canViewPostContent ? getPurchasedPostAttachmentIds(basePost.id, currentUser?.id) : Promise.resolve(new Set<string>())
+  const purchasedBlockBuyerCountsPromise = canViewPostContent ? getPurchasedPostBlockBuyerCounts(basePost.id) : Promise.resolve(new Map<string, number>())
   const tipSummaryPromise = canViewRestrictedPost ? getPostTipSummary(basePost.id, currentUser?.id) : Promise.resolve(undefined)
-  const redPacketSummaryPromise = canViewRestrictedPost ? getPostRedPacketSummary(basePost.id, currentUser?.id) : Promise.resolve(undefined)
-  const postAuctionSummaryPromise = basePost.type === "AUCTION" && (canViewRestrictedPost || isOwnerOrManager)
+  const redPacketSummaryPromise = canViewPostContent ? getPostRedPacketSummary(basePost.id, currentUser?.id) : Promise.resolve(undefined)
+  const postAuctionSummaryPromise = basePost.type === "AUCTION" && canViewPostContent
     ? getPostAuctionSummary(basePost.id, currentUser?.id, { isAdmin: isSiteAdmin })
     : Promise.resolve(undefined)
   const postOfflineMetaPromise = currentUser?.id === basePost.authorId ? getPostOfflineActionMeta(basePost.id) : Promise.resolve(null)
@@ -279,7 +276,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
   }
 
   const postWithAuction = postAuctionSummary ? { ...basePost, auction: postAuctionSummary } : basePost
-  const displayPost = canViewRestrictedPost
+  const displayPost = canViewPostContent
     ? { ...postWithAuction, redPacket: redPacketSummary ?? postWithAuction.redPacket, tipping: tipSummary ? {
       enabled: tipSummary.enabled,
       isLoggedIn: tipSummary.isLoggedIn,
@@ -498,15 +495,13 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
               </div>
             ) : null}
 
-            {shouldRenderOfflineNotice ? (
-              <Card>
-                <CardContent className="p-8">
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-6 text-center text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200">
-                    当前帖子已被<strong>下线</strong>。
-                  </div>
-                </CardContent>
-              </Card>
-            ) : !canViewRestrictedPost && canViewPublicPost ? (
+            {displayPost.status === "OFFLINE" ? (
+              <div className="rounded-xl border border-slate-300 bg-slate-50 px-5 py-4 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-900/60 dark:text-slate-100">
+                当前帖子已<strong>下线</strong>，仅作者和管理员可查看。{displayPost.reviewNote ? `下线原因：${displayPost.reviewNote}` : "暂未填写下线原因。"}
+              </div>
+            ) : null}
+
+            {!canViewRestrictedPost && canViewPublicPost ? (
               <AccessDeniedCard title="当前帖子暂不可查看" description="该帖子所在节点、分区或帖子本身设置了浏览门槛，未满足条件的用户无法查看帖子正文与互动内容。" reason={mergedViewPermission.message || "当前没有访问权限"} isLoggedIn={Boolean(currentUser)} redirectTarget={`/posts/${params.slug}`} />
             ) : (
 

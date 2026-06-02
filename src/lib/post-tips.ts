@@ -29,6 +29,7 @@ import { getBusinessDayRange } from "@/lib/formatters"
 import { createSystemNotification } from "@/lib/notification-writes"
 import { PublicRouteError } from "@/lib/public-route-error"
 import { getSiteSettings, type SiteTippingGiftItem } from "@/lib/site-settings"
+import { executeAddonAsyncWaterfallHook } from "@/addons-host/runtime/hooks"
 
 export interface PostTipLeaderboardItem {
   userId: number
@@ -159,9 +160,8 @@ function validateSupportContext(params: {
     postTipError(403, "当前账号状态不可进行打赏")
   }
 
-  if (sender.points < amount) {
-    postTipError(400, `${pointName}不足，无法完成打赏`)
-  }
+  void amount
+  void pointName
 }
 
 async function createPostSupportBaseTransaction(params: {
@@ -378,6 +378,44 @@ async function createPostSupportBaseTransaction(params: {
   })
 }
 
+async function applyPostTipSummaryHook(
+  summary: PostTipSummary,
+  payload: {
+    targetType: "post" | "comment"
+    postId?: string
+    commentId?: string
+    currentUserId?: number
+  },
+) {
+  const { value } = await executeAddonAsyncWaterfallHook("post.tip.summary", summary, {
+    payload,
+  })
+
+  return {
+    ...summary,
+    ...value,
+    enabled: Boolean(value.enabled),
+    isLoggedIn: Boolean(value.isLoggedIn),
+    pointName: typeof value.pointName === "string" && value.pointName.trim()
+      ? value.pointName.trim()
+      : summary.pointName,
+    currentUserPoints: Number.isSafeInteger(value.currentUserPoints)
+      ? Math.max(0, value.currentUserPoints)
+      : summary.currentUserPoints,
+    gifts: Array.isArray(value.gifts) ? value.gifts as SiteTippingGiftItem[] : summary.gifts,
+    giftStats: Array.isArray(value.giftStats) ? value.giftStats as PostGiftStatItem[] : summary.giftStats,
+    recentGiftEvents: Array.isArray(value.recentGiftEvents) ? value.recentGiftEvents as PostGiftRecentEventItem[] : summary.recentGiftEvents,
+    allowedAmounts: Array.isArray(value.allowedAmounts) ? value.allowedAmounts : summary.allowedAmounts,
+    dailyLimit: Number.isSafeInteger(value.dailyLimit) ? Math.max(0, value.dailyLimit) : summary.dailyLimit,
+    perPostLimit: Number.isSafeInteger(value.perPostLimit) ? Math.max(0, value.perPostLimit) : summary.perPostLimit,
+    usedDailyCount: Number.isSafeInteger(value.usedDailyCount) ? Math.max(0, value.usedDailyCount) : summary.usedDailyCount,
+    usedPostCount: Number.isSafeInteger(value.usedPostCount) ? Math.max(0, value.usedPostCount) : summary.usedPostCount,
+    tipCount: Number.isSafeInteger(value.tipCount) ? Math.max(0, value.tipCount) : summary.tipCount,
+    tipTotalPoints: Number.isSafeInteger(value.tipTotalPoints) ? Math.max(0, value.tipTotalPoints) : summary.tipTotalPoints,
+    topSupporters: Array.isArray(value.topSupporters) ? value.topSupporters as PostTipLeaderboardItem[] : summary.topSupporters,
+  } satisfies PostTipSummary
+}
+
 export async function getPostTipSummary(postId: string, currentUserId?: number): Promise<PostTipSummary> {
   const settings = await getSiteSettings()
   const { start, end } = getTodayRange()
@@ -458,7 +496,7 @@ export async function getPostTipSummary(postId: string, currentUserId?: number):
     }]
   })
 
-  return {
+  const summary: PostTipSummary = {
     enabled: settings.tippingEnabled,
     isLoggedIn: Boolean(currentUserId),
     pointName: settings.pointName,
@@ -475,6 +513,12 @@ export async function getPostTipSummary(postId: string, currentUserId?: number):
     tipTotalPoints: postTotals?.tipTotalPoints ?? 0,
     topSupporters,
   }
+
+  return applyPostTipSummaryHook(summary, {
+    targetType: "post",
+    postId,
+    currentUserId,
+  })
 }
 
 export async function getCommentTipSummary(commentId: string, currentUserId?: number): Promise<PostTipSummary> {
@@ -550,7 +594,7 @@ export async function getCommentTipSummary(commentId: string, currentUserId?: nu
     }]
   })
 
-  return {
+  const summary: PostTipSummary = {
     enabled: settings.tippingEnabled,
     isLoggedIn: Boolean(currentUserId),
     pointName: settings.pointName,
@@ -567,6 +611,12 @@ export async function getCommentTipSummary(commentId: string, currentUserId?: nu
     tipTotalPoints: commentTotals?.tipTotalPoints ?? 0,
     topSupporters,
   }
+
+  return applyPostTipSummaryHook(summary, {
+    targetType: "comment",
+    commentId,
+    currentUserId,
+  })
 }
 
 export async function tipPost(input: { postId: string; senderId: number; amount: number; giftId?: string | null }) {

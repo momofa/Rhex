@@ -910,6 +910,7 @@ function PostActionsCell({
             modalDescription={`帖子：${post.title}`}
             placeholder="填写驳回原因"
             confirmText="确认驳回"
+            messageRequired
             className="h-7 rounded-full bg-red-600 px-2.5 text-xs text-white hover:bg-red-500"
             hideTrigger
             open={activeAction === "reject"}

@@ -3,6 +3,7 @@ import { unstable_cache } from "next/cache"
 import { resolvePagination } from "@/db/helpers"
 import { findFollowFeedTargetIds } from "@/db/follow-queries"
 import { countFollowingFeedPosts, countLatestFeedPosts, findFollowingFeedPosts, findLatestFeedPosts, findLatestReplyComments, findLatestTopicPosts } from "@/db/forum-feed-queries"
+import { shouldBypassPublicPostListCache, type PostListVisibilityViewer } from "@/db/post-list-visibility"
 import { findGlobalPinnedPosts } from "@/db/taxonomy-queries"
 import { FORUM_FEED_CACHE_TAG } from "@/lib/content-list-cache"
 import { formatRelativeTime } from "@/lib/formatters"
@@ -12,7 +13,7 @@ import { extractPinnedPostIds } from "@/lib/pinned-posts"
 import { resolvePostCoverImage } from "@/lib/post-cover"
 import { getPublicPostContentText } from "@/lib/post-content"
 import { parsePostRewardPoolConfigFromContent } from "@/lib/post-red-packets"
-import { getPostTypeLabel, type LocalPostType } from "@/lib/post-types"
+import { getPostStatusLabel, getPostTypeLabel, type LocalPostType } from "@/lib/post-types"
 import { getUserAvatarPath, getUserDisplayName } from "@/lib/user-display"
 import type { PostRewardPoolMode } from "@/lib/post-reward-pool-config"
 
@@ -62,6 +63,9 @@ export interface ForumFeedItem {
   isFeatured: boolean
   type: LocalPostType
   typeLabel: string
+  status: string
+  statusLabel: string
+  reviewNote?: string | null
 }
 
 async function readPublicFeedPage(
@@ -69,21 +73,22 @@ async function readPublicFeedPage(
   pageSize: number,
   sort: Exclude<FeedSort, "following">,
   hotRecentWindowHours: number,
+  viewer?: PostListVisibilityViewer | null,
 ): Promise<ForumFeedPageResult> {
   const [anonymousMaskIdentity, globalPinnedPosts] = await Promise.all([
     getAnonymousMaskDisplayIdentity(),
-    findGlobalPinnedPosts({ homeVisibleOnly: true }),
+    findGlobalPinnedPosts({ homeVisibleOnly: true, viewer }),
   ])
   const pinnedPostIds = extractPinnedPostIds(globalPinnedPosts)
   const requestedPagination = resolvePagination({ page, pageSize }, Number.MAX_SAFE_INTEGER, [pageSize], pageSize)
   const [total, requestedNormalPosts] = await Promise.all([
-    countLatestFeedPosts(pinnedPostIds),
-    findLatestFeedPosts(requestedPagination.page, requestedPagination.pageSize, sort, pinnedPostIds, hotRecentWindowHours),
+    countLatestFeedPosts(pinnedPostIds, viewer),
+    findLatestFeedPosts(requestedPagination.page, requestedPagination.pageSize, sort, pinnedPostIds, hotRecentWindowHours, viewer),
   ])
   const pagination = resolvePagination({ page, pageSize }, total, [pageSize], pageSize)
   const normalPosts = pagination.page === requestedPagination.page
     ? requestedNormalPosts
-    : await findLatestFeedPosts(pagination.page, pagination.pageSize, sort, pinnedPostIds, hotRecentWindowHours)
+    : await findLatestFeedPosts(pagination.page, pagination.pageSize, sort, pinnedPostIds, hotRecentWindowHours, viewer)
 
   return {
     items: pagination.page === 1
@@ -141,6 +146,8 @@ type FeedPost = {
   tipCount: number | null
   tipTotalPoints: number | null
   pinScope: string | null
+  status: string
+  reviewNote?: string | null
   minViewLevel: number | null
   minViewVipLevel: number | null
   isFeatured: boolean
@@ -222,6 +229,9 @@ function mapFeedPost(post: FeedPostRecord | PinnedFeedPostRecord, anonymousMaskI
     isPinned: feedPost.isPinned,
 
     pinScope: feedPost.pinScope ?? (feedPost.isPinned ? "BOARD" : "NONE"),
+    status: feedPost.status,
+    statusLabel: getPostStatusLabel(feedPost.status),
+    reviewNote: feedPost.reviewNote ?? null,
     minViewLevel: feedPost.minViewLevel ?? 0,
     minViewVipLevel: feedPost.minViewVipLevel ?? 0,
     isFeatured: feedPost.isFeatured,
@@ -236,7 +246,10 @@ export async function getLatestFeed(
   sort: FeedSort = "latest",
   currentUserId?: number,
   hotRecentWindowHours = 72,
+  viewer?: PostListVisibilityViewer | null,
 ): Promise<ForumFeedPageResult> {
+  const resolvedViewer = viewer ?? (currentUserId ? { userId: currentUserId } : null)
+
   if (sort === "following") {
     if (!currentUserId) {
       return {
@@ -267,13 +280,13 @@ export async function getLatestFeed(
     const requestedPagination = resolvePagination({ page, pageSize }, Number.MAX_SAFE_INTEGER, [pageSize], pageSize)
     const [anonymousMaskIdentity, total, requestedPosts] = await Promise.all([
       getAnonymousMaskDisplayIdentity(),
-      countFollowingFeedPosts({ boardIds, authorIds, tagIds }),
-      findFollowingFeedPosts(requestedPagination.page, requestedPagination.pageSize, sort, { boardIds, authorIds, tagIds }, hotRecentWindowHours),
+      countFollowingFeedPosts({ boardIds, authorIds, tagIds }, resolvedViewer),
+      findFollowingFeedPosts(requestedPagination.page, requestedPagination.pageSize, sort, { boardIds, authorIds, tagIds }, hotRecentWindowHours, resolvedViewer),
     ])
     const pagination = resolvePagination({ page, pageSize }, total, [pageSize], pageSize)
     const posts = pagination.page === requestedPagination.page
       ? requestedPosts
-      : await findFollowingFeedPosts(pagination.page, pagination.pageSize, sort, { boardIds, authorIds, tagIds }, hotRecentWindowHours)
+      : await findFollowingFeedPosts(pagination.page, pagination.pageSize, sort, { boardIds, authorIds, tagIds }, hotRecentWindowHours, resolvedViewer)
 
     return {
       items: posts.map((post) => mapFeedPost(post, anonymousMaskIdentity)),
@@ -286,11 +299,11 @@ export async function getLatestFeed(
     }
   }
 
-  if (!currentUserId && page <= PUBLIC_FEED_CACHE_MAX_PAGE) {
+  if (!shouldBypassPublicPostListCache(resolvedViewer) && page <= PUBLIC_FEED_CACHE_MAX_PAGE) {
     return getPersistentPublicFeedPage(page, pageSize, sort, hotRecentWindowHours)
   }
 
-  return readPublicFeedPage(page, pageSize, sort, hotRecentWindowHours)
+  return readPublicFeedPage(page, pageSize, sort, hotRecentWindowHours, resolvedViewer)
 }
 
 export async function getLatestTopics(limit = 10) {

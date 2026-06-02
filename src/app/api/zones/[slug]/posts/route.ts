@@ -3,6 +3,7 @@ import { buildHookedPostStreamDisplayItems } from "@/lib/addon-feed-posts"
 import { getCurrentUser } from "@/lib/auth"
 import { checkBoardPermission } from "@/lib/board-access"
 import { normalizeTaxonomyPostSort } from "@/lib/forum-taxonomy-sort"
+import { resolveAdminActorFromSessionUser } from "@/lib/moderator-permissions"
 import { DEFAULT_ALLOWED_POST_TYPES } from "@/lib/post-types"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getZoneBySlug, getZonePosts } from "@/lib/zones"
@@ -69,7 +70,10 @@ export const GET = createRouteHandler(async ({ request, routeContext }) => {
   }
 
   const currentSort = parseSort(request)
-  const result = await getZonePosts(slug, parsePage(request), settings.zonePostPageSize, currentSort)
+  const result = await getZonePosts(slug, parsePage(request), settings.zonePostPageSize, currentSort, {
+    userId: currentUser?.id ?? null,
+    adminActor: await resolveAdminActorFromSessionUser(currentUser),
+  })
 
   return apiSuccess({
     ...result,

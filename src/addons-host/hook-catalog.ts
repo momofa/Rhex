@@ -462,6 +462,8 @@ const asyncWaterfallHookCatalog: readonly AddonExtensionPointCatalogEntry[] = [
   { name: "sitemap.entries", kind: "asyncWaterfall", category: "seo", scope: "service", summary: "串行扩展 sitemap.xml 条目列表。", returns: "AddonSitemapEntry[]" },
   { name: "post.related.items", kind: "asyncWaterfall", category: "post", scope: "service", summary: "串行改写帖子详情页相关推荐列表。", returns: "AddonPostRecord[]" },
   { name: "post.content.render", kind: "asyncWaterfall", category: "post", scope: "service", summary: "串行改写帖子正文渲染后的 HTML（代码高亮、LaTeX、Mermaid、表格美化等）。", returns: "string" },
+  { name: "points.settlement.resolve", kind: "asyncWaterfall", category: "points", scope: "service", summary: "积分结算写入前的可接管决策；插件可在当前事务内处理指定 scopeKey 并标记 handled。", returns: "AddonPointSettlementValue" },
+  { name: "post.tip.summary", kind: "asyncWaterfall", category: "points", scope: "service", summary: "串行改写帖子 / 评论打赏摘要，可调整余额展示、货币名与可用状态。", returns: "AddonTipSummaryValue" },
 ] as const
 
 export const ADDON_EXTENSION_POINT_CATALOG: readonly AddonExtensionPointCatalogEntry[] = [

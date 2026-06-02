@@ -86,11 +86,15 @@ function parseRules(input: unknown) {
       apiError(400, `${itemLabel}的运算符无效`)
     }
 
+    if (ruleType === BadgeRuleType.VERIFICATION_TYPE && operator !== BadgeRuleOperator.EQ) {
+      apiError(400, `${itemLabel}只能使用“拥有”运算符`)
+    }
+
     if (!value) {
       apiError(400, `${itemLabel}的目标值不能为空`)
     }
 
-    if (operator === BadgeRuleOperator.BETWEEN && !extraValue) {
+    if (operator === BadgeRuleOperator.BETWEEN && ruleType !== BadgeRuleType.VERIFICATION_TYPE && !extraValue) {
       apiError(400, `${itemLabel}使用区间运算时必须填写额外值`)
     }
 
@@ -108,6 +112,44 @@ function parseRules(input: unknown) {
     extraValue: string | null
     sortOrder: number
   }>
+}
+
+async function normalizeRulesForStorage(rules: ReturnType<typeof parseRules>) {
+  const verificationTypeIds = Array.from(new Set(
+    rules
+      .filter((rule) => rule.ruleType === BadgeRuleType.VERIFICATION_TYPE)
+      .map((rule) => rule.value),
+  ))
+
+  if (verificationTypeIds.length === 0) {
+    return rules
+  }
+
+  const verificationTypes = await prisma.verificationType.findMany({
+    where: { id: { in: verificationTypeIds } },
+    select: {
+      id: true,
+      name: true,
+    },
+  })
+  const verificationTypeMap = new Map(verificationTypes.map((item) => [item.id, item.name]))
+  const missingVerificationTypeId = verificationTypeIds.find((id) => !verificationTypeMap.has(id))
+
+  if (missingVerificationTypeId) {
+    apiError(400, "指定认证不存在")
+  }
+
+  return rules.map((rule) => {
+    if (rule.ruleType !== BadgeRuleType.VERIFICATION_TYPE) {
+      return rule
+    }
+
+    return {
+      ...rule,
+      operator: BadgeRuleOperator.EQ,
+      extraValue: verificationTypeMap.get(rule.value) ?? null,
+    }
+  })
 }
 
 function parseOptionalMinute(value: unknown, fieldLabel: string, itemLabel: string) {
@@ -348,7 +390,7 @@ export const POST = createAdminRouteHandler(async ({ request, adminUser }) => {
   const body = await readJsonBody(request)
   const name = requireStringField(body, "name", "勋章名称和标识不能为空")
   const code = requireStringField(body, "code", "勋章名称和标识不能为空")
-  const rules = parseRules(body.rules)
+  const rules = await normalizeRulesForStorage(parseRules(body.rules))
   const effects = parseEffects(body.effects)
 
   const badge = await prisma.$transaction(async (tx) => {
@@ -393,7 +435,7 @@ export const PUT = createAdminRouteHandler(async ({ request, adminUser }) => {
   const id = requireStringField(body, "id", "缺少必要参数")
   const name = requireStringField(body, "name", "缺少必要参数")
   const code = requireStringField(body, "code", "缺少必要参数")
-  const rules = parseRules(body.rules)
+  const rules = await normalizeRulesForStorage(parseRules(body.rules))
   const effects = parseEffects(body.effects)
 
   await prisma.$transaction(async (tx) => {

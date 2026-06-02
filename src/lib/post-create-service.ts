@@ -328,11 +328,12 @@ export async function createPostFlow(body: unknown, options: CreatePostFlowOptio
   })
 
   const statusMode = options.statusMode ?? "AUTO"
+  const skipsAutoReview = author.role === "ADMIN" || author.role === "MODERATOR"
   const shouldPending = statusMode === "PENDING"
     ? true
     : statusMode === "PUBLISHED"
       ? false
-      : Boolean(boardContext.settings.requirePostReview)
+      : !skipsAutoReview && Boolean(boardContext.settings.requirePostReview)
   const contentAdjusted = Boolean(
     titleHookAdjusted
     || contentHookAdjusted

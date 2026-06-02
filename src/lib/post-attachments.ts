@@ -725,10 +725,6 @@ export async function purchasePostAttachment(input: {
       userId: attachment.post.authorId,
     })
 
-    if (buyerPreparedDelta.finalDelta < 0 && buyer.points < Math.abs(buyerPreparedDelta.finalDelta)) {
-      apiError(400, `当前${settings.pointName}不足`)
-    }
-
     let purchaseRecord: Awaited<ReturnType<typeof createPostAttachmentPurchase>> | null = null
 
     try {

@@ -118,7 +118,7 @@ export interface NotificationCountStreamEvent {
   type: "notification.count"
   userId: number
   unreadNotificationCount: number
-  reason: "created" | "created-batch" | "read" | "read-all"
+  reason: "created" | "created-batch" | "read" | "read-all" | "deleted" | "deleted-batch"
   notificationId?: string
   occurredAt: string
 }

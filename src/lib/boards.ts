@@ -3,6 +3,7 @@ import { cache } from "react"
 
 import { findFollowRecord } from "@/db/follow-queries"
 import { resolvePagination } from "@/db/helpers"
+import { shouldBypassPublicPostListCache, type PostListVisibilityViewer } from "@/db/post-list-visibility"
 import { countBoardNormalPosts, findBoardNormalPosts, findBoardPinnedPosts, findZoneBoardIdsById } from "@/db/taxonomy-queries"
 import { normalizeBoardSidebarConfig, type BoardSidebarLinkItem } from "@/lib/board-sidebar-config"
 import { resolveBoardSettings } from "@/lib/board-settings"
@@ -194,6 +195,7 @@ async function readBoardPosts(
   page = 1,
   pageSize = 30,
   sort: TaxonomyPostSort = "latest",
+  viewer?: PostListVisibilityViewer | null,
 ): Promise<BoardPostPageResult> {
   const board = await getBoardBySlug(slug)
 
@@ -212,14 +214,14 @@ async function readBoardPosts(
   const anonymousMaskIdentity = await getAnonymousMaskDisplayIdentity()
   const zone = board.zoneId ? await findZoneBoardIdsById(board.zoneId) : null
   const zoneBoardIds = zone?.boards.map((item: (typeof zone.boards)[number]) => item.id) ?? [board.id]
-  const pinnedPosts = (await findBoardPinnedPosts(board.id, zoneBoardIds)).filter((post) => sort !== "featured" || post.isFeatured)
+  const pinnedPosts = (await findBoardPinnedPosts(board.id, zoneBoardIds, undefined, viewer)).filter((post) => sort !== "featured" || post.isFeatured)
   const excludedPostIds = extractPinnedPostIds(pinnedPosts)
-  const total = await countBoardNormalPosts(board.id, excludedPostIds, sort)
+  const total = await countBoardNormalPosts(board.id, excludedPostIds, sort, viewer)
   const pagination = resolvePagination({ page, pageSize }, total, [pageSize], pageSize)
 
   if (pagination.page === 1) {
     const { pinnedItems, pinnedPostIds } = dedupeAndMapPinnedPosts(pinnedPosts, (post) => mapListPost(post, anonymousMaskIdentity))
-    const normalPosts = await findBoardNormalPosts(board.id, pinnedPostIds, 1, pagination.pageSize, sort)
+    const normalPosts = await findBoardNormalPosts(board.id, pinnedPostIds, 1, pagination.pageSize, sort, viewer)
     const items = await applyHookedUserPresentationToSitePosts([
       ...pinnedItems,
       ...normalPosts.map((post) => mapListPost(post, anonymousMaskIdentity)),
@@ -236,7 +238,7 @@ async function readBoardPosts(
     }
   }
 
-  const normalPosts = await findBoardNormalPosts(board.id, excludedPostIds, pagination.page, pagination.pageSize, sort)
+  const normalPosts = await findBoardNormalPosts(board.id, excludedPostIds, pagination.page, pagination.pageSize, sort, viewer)
   const items = await applyHookedUserPresentationToSitePosts(
     normalPosts.map((post) => mapListPost(post, anonymousMaskIdentity)),
   )
@@ -266,12 +268,13 @@ export async function getBoardPosts(
   page = 1,
   pageSize = 30,
   sort: TaxonomyPostSort = "latest",
+  viewer?: PostListVisibilityViewer | null,
 ): Promise<BoardPostPageResult> {
-  if (shouldCacheTaxonomyPostPage(page)) {
+  if (!shouldBypassPublicPostListCache(viewer) && shouldCacheTaxonomyPostPage(page)) {
     return getPersistentBoardPosts(slug, page, pageSize, sort)
   }
 
-  return readBoardPosts(slug, page, pageSize, sort)
+  return readBoardPosts(slug, page, pageSize, sort, viewer)
 }
 
 export async function isUserFollowingBoard(userId: number, boardId: string) {

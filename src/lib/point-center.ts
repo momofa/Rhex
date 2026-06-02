@@ -1,5 +1,7 @@
 import { createPointLogWithAudit } from "@/db/point-log-audit-queries"
 import { listAllPointEffectRuleRows, listGlobalActivePointEffectRuleRows } from "@/db/point-effect-rule-queries"
+import type { PrismaClient } from "@prisma/client"
+
 import { ChangeType, PointEffectDirection, PointEffectRuleKind, PointEffectTargetType, Prisma, type RelatedType } from "@/db/types"
 import { apiError } from "@/lib/api-route"
 import { findDisplayedBadgeEffectRules } from "@/db/badge-queries"
@@ -8,7 +10,8 @@ import { getPointEffectAllScopeKeyByTargetType, isPointEffectScopeMatchableForBa
 import { buildPointLogEffectMetadata, buildPointLogTaxMetadata, mergePointLogMetadataIntoEventData } from "@/lib/point-log-audit"
 import type { PointLogEventDataInput, PointLogEventType } from "@/lib/point-log-events"
 import { addSafeIntegers, subtractSafeIntegers } from "@/lib/shared/safe-integer"
-import { executeAddonActionHook } from "@/addons-host/runtime/hooks"
+import { executeAddonActionHook, executeAddonAsyncWaterfallHook } from "@/addons-host/runtime/hooks"
+import type { AddonPointSettlementValue } from "@/addons-host/types"
 
 type PointEffectClient = Prisma.TransactionClient
 const POINT_EFFECT_RULE_CACHE_TTL_MS = 5_000
@@ -416,6 +419,43 @@ export async function applyPointDelta(params: {
   const finalDelta = prepared.finalDelta
 
   if (finalDelta !== 0) {
+    const settlement = await executeAddonAsyncWaterfallHook("points.settlement.resolve", {
+      handled: false,
+      userId: params.userId,
+      beforeBalance,
+      afterBalance: null,
+      baseDelta: prepared.baseDelta,
+      finalDelta,
+      scopeKey: prepared.scopeKey,
+      pointName: params.pointName,
+      reason: params.reason.trimEnd(),
+      eventType: params.eventType ?? null,
+      eventData: params.eventData,
+      relatedType: params.relatedType ?? null,
+      relatedId: params.relatedId ?? null,
+      insufficientMessage: params.insufficientMessage ?? null,
+      currencyCode: "site-points",
+      currencyName: params.pointName,
+    } satisfies AddonPointSettlementValue, {
+      payload: {
+        source: "applyPointDelta",
+      },
+      databaseClient: params.tx as unknown as PrismaClient,
+      throwOnError: true,
+    })
+
+    if (settlement.value.handled) {
+      const afterBalance = settlement.value.afterBalance
+      if (typeof afterBalance !== "number" || !Number.isSafeInteger(afterBalance)) {
+        apiError(500, "插件积分结算结果无效")
+      }
+
+      return {
+        finalDelta,
+        afterBalance,
+      }
+    }
+
     const changeValue = Math.abs(finalDelta)
     let actualBeforeBalance = beforeBalance
     let actualAfterBalance = addSafeIntegers(beforeBalance, finalDelta)

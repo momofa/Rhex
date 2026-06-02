@@ -32,7 +32,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { showConfirm } from "@/components/ui/alert-dialog"
 import { describeIconSource } from "@/lib/icon-source"
-import { formatDateTime } from "@/lib/formatters"
+import { formatDateTime, formatNumber } from "@/lib/formatters"
 import type { VerificationFormField } from "@/lib/verification-form-schema"
 import { cn } from "@/lib/utils"
 
@@ -47,6 +47,7 @@ export type AdminVerificationTypeItem = {
   iconText: string
   color: string
   formFields: AdminVerificationFieldItem[]
+  pointsCost: number
   sortOrder: number
   status: boolean
   needRemark: boolean
@@ -118,6 +119,7 @@ function createVerificationType(nextSortOrder: number): AdminVerificationTypeIte
     iconText: "✔️",
     color: "#2563eb",
     formFields: [],
+    pointsCost: 0,
     sortOrder: nextSortOrder,
     status: true,
     needRemark: true,
@@ -361,7 +363,7 @@ export function AdminVerificationManager({ initialTypes, initialApplications, mo
                             <p className="truncate text-sm font-semibold">{item.name}</p>
                             <Badge className={item.status ? "border-transparent bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200" : "border-transparent bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300"}>{item.status ? "启用" : "停用"}</Badge>
                           </div>
-                          <p className="mt-1 truncate text-xs text-muted-foreground">{item.slug} · 字段 {item.formFields.length} · 申请 {item.applicationCount ?? 0}</p>
+                          <p className="mt-1 truncate text-xs text-muted-foreground">{item.slug} · {item.pointsCost > 0 ? `${formatNumber(item.pointsCost)} 积分` : "免费"} · 字段 {item.formFields.length} · 申请 {item.applicationCount ?? 0}</p>
                         </div>
                       </div>
                       <Pencil className="h-4 w-4 text-muted-foreground" />
@@ -433,6 +435,7 @@ export function AdminVerificationManager({ initialTypes, initialApplications, mo
               <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <Field label="认证名称" value={editingType.name} onChange={(value) => updateType(editingIndex!, { name: value })} placeholder="如 个人认证" />
                 <Field label="唯一标识" value={editingType.slug} onChange={(value) => updateType(editingIndex!, { slug: value.replace(/\s+/g, "-") })} placeholder="如 personal-verified" />
+                <Field label="申请消耗积分" type="number" value={String(editingType.pointsCost)} onChange={(value) => updateType(editingIndex!, { pointsCost: Math.max(0, Math.floor(Number(value) || 0)) })} placeholder="0" />
                 <Field label="排序" type="number" value={String(editingType.sortOrder)} onChange={(value) => updateType(editingIndex!, { sortOrder: Math.max(0, Number(value) || 0) })} placeholder="0" />
                 <IconPicker
                   label="认证图标"

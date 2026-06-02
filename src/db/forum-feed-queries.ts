@@ -1,8 +1,8 @@
 import { prisma } from "@/db/client"
 import { postListInclude } from "@/db/queries"
 import { buildHomeVisiblePostWhere } from "@/db/home-feed-visibility"
+import { buildPostListVisibilityWhere, type PostListVisibilityViewer } from "@/db/post-list-visibility"
 import type { Prisma } from "@/db/types"
-import { PUBLIC_READABLE_POST_STATUSES } from "@/lib/post-types"
 
 export type FeedQuerySort = "latest" | "new" | "hot" | "weekly" | "following"
 
@@ -89,6 +89,7 @@ function getHotRecentWindowStart(windowHours: number) {
 function buildFeedWhere(
   excludedPostIds: string[] = [],
   filters?: FollowFeedFilters,
+  viewer?: PostListVisibilityViewer | null,
 ): Prisma.PostWhereInput {
   const followClauses: Prisma.PostWhereInput[] = []
 
@@ -122,8 +123,10 @@ function buildFeedWhere(
   }
 
   return {
-    ...buildHomeVisiblePostWhere(),
-    status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
+    AND: [
+      buildHomeVisiblePostWhere(),
+      buildPostListVisibilityWhere(viewer),
+    ],
     id: excludedPostIds.length > 0 ? { notIn: excludedPostIds } : undefined,
     OR: followClauses.length > 0 ? followClauses : undefined,
   }
@@ -133,9 +136,10 @@ function buildRecentHotWhere(
   recentWindowStart: Date,
   excludedPostIds: string[] = [],
   filters?: FollowFeedFilters,
+  viewer?: PostListVisibilityViewer | null,
 ): Prisma.PostWhereInput {
   return {
-    ...buildFeedWhere(excludedPostIds, filters),
+    ...buildFeedWhere(excludedPostIds, filters, viewer),
     activityAt: {
       gte: recentWindowStart,
     },
@@ -146,9 +150,10 @@ function buildHistoricalHotWhere(
   recentWindowStart: Date,
   excludedPostIds: string[] = [],
   filters?: FollowFeedFilters,
+  viewer?: PostListVisibilityViewer | null,
 ): Prisma.PostWhereInput {
   return {
-    ...buildFeedWhere(excludedPostIds, filters),
+    ...buildFeedWhere(excludedPostIds, filters, viewer),
     activityAt: {
       lt: recentWindowStart,
     },
@@ -161,12 +166,13 @@ async function findHybridHotFeedPosts(
   hotRecentWindowHours: number,
   excludedPostIds: string[] = [],
   filters?: FollowFeedFilters,
+  viewer?: PostListVisibilityViewer | null,
 ) {
   const normalizedPageSize = Math.min(Math.max(1, pageSize), 50)
   const skip = (page - 1) * normalizedPageSize
   const recentWindowStart = getHotRecentWindowStart(hotRecentWindowHours)
-  const recentWhere = buildRecentHotWhere(recentWindowStart, excludedPostIds, filters)
-  const historyWhere = buildHistoricalHotWhere(recentWindowStart, excludedPostIds, filters)
+  const recentWhere = buildRecentHotWhere(recentWindowStart, excludedPostIds, filters, viewer)
+  const historyWhere = buildHistoricalHotWhere(recentWindowStart, excludedPostIds, filters, viewer)
 
   if (page === 1) {
     const recentPosts = await prisma.post.findMany({
@@ -227,15 +233,15 @@ async function findHybridHotFeedPosts(
   return [...recentPosts, ...historyPosts]
 }
 
-export function findLatestFeedPosts(page: number, pageSize: number, sort: FeedQuerySort, excludedPostIds: string[] = [], hotRecentWindowHours = 72) {
+export function findLatestFeedPosts(page: number, pageSize: number, sort: FeedQuerySort, excludedPostIds: string[] = [], hotRecentWindowHours = 72, viewer?: PostListVisibilityViewer | null) {
   if (sort === "hot") {
-    return findHybridHotFeedPosts(page, pageSize, hotRecentWindowHours, excludedPostIds)
+    return findHybridHotFeedPosts(page, pageSize, hotRecentWindowHours, excludedPostIds, undefined, viewer)
   }
 
   const normalizedPageSize = Math.min(Math.max(1, pageSize), 50)
 
   return prisma.post.findMany({
-    where: buildFeedWhere(excludedPostIds),
+    where: buildFeedWhere(excludedPostIds, undefined, viewer),
     include: feedPostInclude,
     orderBy: getFeedOrderBy(sort),
     skip: (page - 1) * normalizedPageSize,
@@ -243,9 +249,9 @@ export function findLatestFeedPosts(page: number, pageSize: number, sort: FeedQu
   })
 }
 
-export function countLatestFeedPosts(excludedPostIds: string[] = []) {
+export function countLatestFeedPosts(excludedPostIds: string[] = [], viewer?: PostListVisibilityViewer | null) {
   return prisma.post.count({
-    where: buildFeedWhere(excludedPostIds),
+    where: buildFeedWhere(excludedPostIds, undefined, viewer),
   })
 }
 
@@ -255,15 +261,16 @@ export function findFollowingFeedPosts(
   sort: FeedQuerySort,
   filters: FollowFeedFilters,
   hotRecentWindowHours = 72,
+  viewer?: PostListVisibilityViewer | null,
 ) {
   if (sort === "hot") {
-    return findHybridHotFeedPosts(page, pageSize, hotRecentWindowHours, [], filters)
+    return findHybridHotFeedPosts(page, pageSize, hotRecentWindowHours, [], filters, viewer)
   }
 
   const normalizedPageSize = Math.min(Math.max(1, pageSize), 50)
 
   return prisma.post.findMany({
-    where: buildFeedWhere([], filters),
+    where: buildFeedWhere([], filters, viewer),
     include: feedPostInclude,
     orderBy: getFeedOrderBy(sort),
     skip: (page - 1) * normalizedPageSize,
@@ -271,9 +278,9 @@ export function findFollowingFeedPosts(
   })
 }
 
-export function countFollowingFeedPosts(filters: FollowFeedFilters) {
+export function countFollowingFeedPosts(filters: FollowFeedFilters, viewer?: PostListVisibilityViewer | null) {
   return prisma.post.count({
-    where: buildFeedWhere([], filters),
+    where: buildFeedWhere([], filters, viewer),
   })
 }
 
@@ -284,7 +291,7 @@ export function findLatestTopicPosts(limit: number) {
   return prisma.post.findMany({
     where: {
       ...buildHomeVisiblePostWhere(),
-      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
+      ...buildPostListVisibilityWhere(),
     },
     orderBy: { createdAt: "desc" },
     take: limit,
@@ -301,7 +308,7 @@ export function findLatestReplyComments(limit: number) {
       status: "NORMAL",
       post: {
         ...buildHomeVisiblePostWhere(),
-        status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
+        ...buildPostListVisibilityWhere(),
       },
     },
     orderBy: { createdAt: "desc" },

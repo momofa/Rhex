@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -89,9 +90,17 @@ type BadgeFormItem = {
   effects: BadgeEffectFormItem[]
 }
 
+type VerificationTypeOption = {
+  id: string
+  name: string
+  iconText?: string | null
+  status: boolean
+}
+
 interface AdminBadgeManagerProps {
   initialBadges: BadgeFormItem[]
   initialLevelDefinitions: LevelDefinitionItem[]
+  initialVerificationTypes: VerificationTypeOption[]
 }
 
 type EffectModalState = {
@@ -116,19 +125,35 @@ const registerTimeOperatorOptions: Array<{ value: BadgeRuleOperator; label: stri
   { value: BadgeRuleOperator.AFTER, label: "晚于" },
 ]
 
+const verificationOperatorOptions: Array<{ value: BadgeRuleOperator; label: string }> = [
+  { value: BadgeRuleOperator.EQ, label: "拥有" },
+]
+
 function getBadgeRuleOperatorOptions(ruleType: BadgeRuleTypeValue) {
+  if (ruleType === BadgeRuleType.VERIFICATION_TYPE) {
+    return verificationOperatorOptions
+  }
+
   return ruleType === BadgeRuleType.REGISTER_TIME_RANGE ? registerTimeOperatorOptions : numericOperatorOptions
 }
 
 function getDefaultBadgeRuleOperator(ruleType: BadgeRuleTypeValue) {
+  if (ruleType === BadgeRuleType.VERIFICATION_TYPE) {
+    return BadgeRuleOperator.EQ
+  }
+
   return ruleType === BadgeRuleType.REGISTER_TIME_RANGE ? BadgeRuleOperator.AFTER : BadgeRuleOperator.GTE
 }
 
-function getDefaultBadgeRuleValue(ruleType: BadgeRuleTypeValue) {
+function getDefaultBadgeRuleValue(ruleType: BadgeRuleTypeValue, verificationTypeOptions: Array<{ value: string; label: string }> = []) {
   const valueMode = getBadgeRuleTypeOption(ruleType)?.valueMode
 
   if (valueMode === "datetime-local") {
     return ""
+  }
+
+  if (valueMode === "verification-type") {
+    return verificationTypeOptions[0]?.value ?? ""
   }
 
   return "1"
@@ -239,7 +264,7 @@ function buildEffectValueSummary(effect: BadgeEffectFormItem) {
   return effect.extraValue ? `${effect.value} - ${effect.extraValue}` : effect.value
 }
 
-export function AdminBadgeManager({ initialBadges, initialLevelDefinitions }: AdminBadgeManagerProps) {
+export function AdminBadgeManager({ initialBadges, initialLevelDefinitions, initialVerificationTypes }: AdminBadgeManagerProps) {
   const [badges, setBadges] = useState(initialBadges)
   const [editingIndex, setEditingIndex] = useState<number | null>(initialBadges[0] ? 0 : null)
   const [feedback, setFeedback] = useState("")
@@ -249,6 +274,13 @@ export function AdminBadgeManager({ initialBadges, initialLevelDefinitions }: Ad
   const editingBadge = editingIndex === null ? null : badges[editingIndex] ?? null
   const userLevelOptions = useMemo(() => buildUserLevelThresholdOptions(initialLevelDefinitions), [initialLevelDefinitions])
   const vipLevelOptions = useMemo(() => buildVipLevelThresholdOptions(), [])
+  const verificationTypeOptions = useMemo(() => (
+    initialVerificationTypes.map((type) => ({
+      value: type.id,
+      label: `${type.iconText ?? "✔️"} ${type.name}${type.status ? "" : "（停用）"}`,
+      description: type.status ? "认证类型已启用" : "认证类型已停用",
+    }))
+  ), [initialVerificationTypes])
 
   const categoryStats = useMemo(() => {
     const record = new Map<string, number>()
@@ -648,11 +680,18 @@ export function AdminBadgeManager({ initialBadges, initialLevelDefinitions }: Ad
                   {editingBadge.rules.map((rule, ruleIndex) => {
                     const typeMeta = getBadgeRuleTypeOption(rule.ruleType)
                     const isTimeRange = rule.ruleType === BadgeRuleType.REGISTER_TIME_RANGE
+                    const isVerificationType = rule.ruleType === BadgeRuleType.VERIFICATION_TYPE
                     const registerTimeValueHint = isTimeRange ? (
                       <div className="space-y-1">
                         <p>这里直接用时间选择器选注册时间。</p>
                         <p>`早于 / 晚于` 只填写左侧时间。</p>
                         <p>`区间` 时左侧是开始时间，右侧是结束时间。</p>
+                      </div>
+                    ) : undefined
+                    const verificationTypeValueHint = isVerificationType ? (
+                      <div className="space-y-1">
+                        <p>用户当前通过该认证类型后，才能领取此勋章。</p>
+                        <p>只校验已通过认证，不校验待审核或已驳回申请。</p>
                       </div>
                     ) : undefined
                     const registerTimeExtraHint = isTimeRange && rule.operator === BadgeRuleOperator.BETWEEN ? (
@@ -680,7 +719,7 @@ export function AdminBadgeManager({ initialBadges, initialLevelDefinitions }: Ad
                               updateRule(editingIndex!, ruleIndex, {
                                 ruleType: nextRuleType,
                                 operator: nextOperator,
-                                value: keepCurrentValue ? rule.value : getDefaultBadgeRuleValue(nextRuleType),
+                                value: keepCurrentValue ? rule.value : getDefaultBadgeRuleValue(nextRuleType, verificationTypeOptions),
                                 extraValue: nextOperator === BadgeRuleOperator.BETWEEN && keepCurrentValue && rule.operator === BadgeRuleOperator.BETWEEN
                                   ? rule.extraValue ?? ""
                                   : "",
@@ -700,7 +739,10 @@ export function AdminBadgeManager({ initialBadges, initialLevelDefinitions }: Ad
                             }}
                           />
                           <label className="space-y-2">
-                            <LabelWithHint label={isTimeRange ? "开始值 / 时间" : "目标值"} hint={registerTimeValueHint} />
+                            <LabelWithHint
+                              label={isVerificationType ? "认证类型" : isTimeRange ? "开始值 / 时间" : "目标值"}
+                              hint={verificationTypeValueHint ?? registerTimeValueHint}
+                            />
                             <ConditionValueField
                               mode={typeMeta?.valueMode}
                               value={rule.value}
@@ -708,16 +750,18 @@ export function AdminBadgeManager({ initialBadges, initialLevelDefinitions }: Ad
                               placeholder={typeMeta?.placeholder ?? "请输入条件值"}
                               userLevelOptions={userLevelOptions}
                               vipLevelOptions={vipLevelOptions}
+                              verificationTypeOptions={verificationTypeOptions}
                               className="h-11 w-full rounded-[18px] border border-border bg-background px-4 text-sm outline-hidden transition-colors focus:border-foreground/30"
                             />
                           </label>
                           <label className="space-y-2">
-                            <LabelWithHint label={rule.operator === BadgeRuleOperator.BETWEEN ? "结束时间 / 额外值" : "额外值（可选）"} hint={registerTimeExtraHint} />
+                            <LabelWithHint label={isVerificationType ? "额外值（无需填写）" : rule.operator === BadgeRuleOperator.BETWEEN ? "结束时间 / 额外值" : "额外值（可选）"} hint={registerTimeExtraHint} />
                             <ConditionValueField
                               mode={isTimeRange && rule.operator === BadgeRuleOperator.BETWEEN ? "datetime-local" : "text"}
                               value={rule.extraValue ?? ""}
                               onChange={(value) => updateRule(editingIndex!, ruleIndex, { extraValue: value })}
-                              placeholder={rule.operator === BadgeRuleOperator.BETWEEN ? "选择结束时间" : "一般可留空"}
+                              placeholder={isVerificationType ? "保存后自动记录认证名称" : rule.operator === BadgeRuleOperator.BETWEEN ? "选择结束时间" : "一般可留空"}
+                              disabled={isVerificationType}
                               className="h-11 w-full rounded-[18px] border border-border bg-background px-4 text-sm outline-hidden transition-colors focus:border-foreground/30"
                             />
                           </label>
@@ -1007,9 +1051,11 @@ function SelectField({ label, hint, value, options, onChange }: { label: string;
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {options.map((option) => (
-            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-          ))}
+          <SelectGroup>
+            {options.map((option) => (
+              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+            ))}
+          </SelectGroup>
         </SelectContent>
       </Select>
     </label>

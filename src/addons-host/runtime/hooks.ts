@@ -1,5 +1,7 @@
 import "server-only"
 
+import type { PrismaClient } from "@prisma/client"
+
 import { buildAddonExecutionContext, loadAddonsRegistry } from "@/addons-host/runtime/loader"
 import { runWithAddonExecutionScope } from "@/addons-host/runtime/execution-scope"
 import { runHookPipeline } from "@/addons-host/runtime/internal/hook-pipeline"
@@ -32,6 +34,7 @@ interface AddonHookExecutionInput {
   request?: Request
   pathname?: string
   searchParams?: URLSearchParams
+  databaseClient?: PrismaClient
   throwOnError?: boolean
 }
 
@@ -92,6 +95,7 @@ async function buildActionHookCandidates(
             request: input?.request,
             pathname: input?.pathname,
             searchParams: input?.searchParams,
+            databaseClient: input?.databaseClient,
           }),
           hook: registration.hook,
           payload,
@@ -133,6 +137,7 @@ async function buildWaterfallHookCandidates<TValue>(
               request: input?.request,
               pathname: input?.pathname,
               searchParams: input?.searchParams,
+              databaseClient: input?.databaseClient,
             }),
             hook: registration.hook,
             value,
@@ -165,6 +170,7 @@ async function buildWaterfallHookCandidates<TValue>(
             request: input?.request,
             pathname: input?.pathname,
             searchParams: input?.searchParams,
+            databaseClient: input?.databaseClient,
           }),
           hook: registration.hook,
           value,

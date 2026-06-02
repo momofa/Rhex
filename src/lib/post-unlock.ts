@@ -39,8 +39,8 @@ export async function purchasePostBlock(options: { userId: number; postId: strin
       userId: options.sellerId,
     })
 
-    if (!user || !seller || (buyerPreparedDelta.finalDelta < 0 && user.points < Math.abs(buyerPreparedDelta.finalDelta))) {
-      throw new Error(`当前${settings.pointName}不足`)
+    if (!user || !seller) {
+      throw new Error("用户不存在")
     }
 
     const purchaseRecord = await createPostBlockPurchase({

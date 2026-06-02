@@ -4,13 +4,14 @@ import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
 import type { AccessThresholdOption } from "@/lib/access-threshold-options"
 
-export type ConditionValueFieldMode = "text" | "number" | "user-level" | "vip-level" | "datetime-local"
+export type ConditionValueFieldMode = "text" | "number" | "user-level" | "vip-level" | "datetime-local" | "verification-type"
 
 interface ConditionValueFieldProps {
   mode?: ConditionValueFieldMode
@@ -18,6 +19,7 @@ interface ConditionValueFieldProps {
   placeholder?: string
   userLevelOptions?: AccessThresholdOption[]
   vipLevelOptions?: AccessThresholdOption[]
+  verificationTypeOptions?: AccessThresholdOption[]
   onChange: (value: string) => void
   disabled?: boolean
   className?: string
@@ -53,6 +55,7 @@ function getConditionSelectOptions(
   mode: ConditionValueFieldMode,
   userLevelOptions: AccessThresholdOption[],
   vipLevelOptions: AccessThresholdOption[],
+  verificationTypeOptions: AccessThresholdOption[],
 ) {
   if (mode === "user-level") {
     return userLevelOptions.filter((option) => option.value !== "0")
@@ -60,6 +63,10 @@ function getConditionSelectOptions(
 
   if (mode === "vip-level") {
     return vipLevelOptions.filter((option) => option.value !== "0")
+  }
+
+  if (mode === "verification-type") {
+    return verificationTypeOptions
   }
 
   return null
@@ -71,11 +78,12 @@ export function ConditionValueField({
   placeholder,
   userLevelOptions = [],
   vipLevelOptions = [],
+  verificationTypeOptions = [],
   onChange,
   disabled = false,
   className = "h-11 rounded-full border border-border bg-background px-4 text-sm outline-hidden",
 }: ConditionValueFieldProps) {
-  const selectOptions = getConditionSelectOptions(mode, userLevelOptions, vipLevelOptions)
+  const selectOptions = getConditionSelectOptions(mode, userLevelOptions, vipLevelOptions, verificationTypeOptions)
 
   if (selectOptions && selectOptions.length > 0) {
     const selectedValue = value || selectOptions[0]?.value || ""
@@ -90,11 +98,26 @@ export function ConditionValueField({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {selectOptions.map((option) => (
-            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-          ))}
+          <SelectGroup>
+            {selectOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+            ))}
+          </SelectGroup>
         </SelectContent>
       </Select>
+    )
+  }
+
+  if (mode === "verification-type") {
+    return (
+      <Input
+        type="text"
+        value=""
+        onChange={() => undefined}
+        className={className}
+        placeholder={placeholder ?? "暂无认证类型"}
+        disabled
+      />
     )
   }
 

@@ -166,6 +166,14 @@
 | `sitemap.entries` | seo | 串行扩展 sitemap.xml 条目列表 | `AddonSitemapEntry[]` |
 | `post.related.items` | post | 串行改写帖子详情页相关推荐列表 | `AddonPostRecord[]` |
 | `post.content.render` | post | 串行改写帖子正文渲染后的 HTML（代码高亮、LaTeX、Mermaid、表格美化等） | `string` |
+| `points.settlement.resolve` | points | 积分结算写入 `User.points` 前执行，可在当前事务内接管本次结算并返回 `handled: true` | `AddonPointSettlementValue` |
+| `post.tip.summary` | points | 串行改写帖子 / 评论打赏摘要展示，可调整余额、货币名和可用状态 | `AddonTipSummaryValue` |
+
+补充说明：
+
+- `points.settlement.resolve` 的 `value` 包含 `userId/beforeBalance/baseDelta/finalDelta/scopeKey/pointName/reason/eventType/eventData/relatedType/relatedId/insufficientMessage`。插件返回 `handled: true` 后，宿主跳过默认 `User.points` 写入和默认 `PointLog`。
+- `points.settlement.resolve` 在宿主积分事务内执行，插件侧 `context.database` 会复用当前 transaction client；插件自表写入抛错时会回滚宿主业务事务。
+- `post.tip.summary` 只影响打赏 UI 摘要展示，不负责真实扣款；真实结算仍应通过 `points.settlement.resolve` 接管。
 
 ## Surface
 

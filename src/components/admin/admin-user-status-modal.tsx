@@ -50,8 +50,9 @@ export function AdminUserStatusDialog({ userId, username, action, postId, commen
         <div className="flex items-center gap-2">
           <Button
             type="button"
+            variant={action === "ban" ? "destructive" : "default"}
             disabled={isPending}
-            className={action === "ban" ? "h-9 rounded-full bg-red-600 px-4 text-xs text-white hover:bg-red-500" : "h-9 rounded-full px-4 text-xs"}
+            className="h-9 rounded-full px-4 text-xs"
             onClick={() => {
               setFeedback("")
               startTransition(async () => {
@@ -136,7 +137,7 @@ export function AdminUserStatusModal({ userId, username, action, triggerClassNam
 
   return (
     <>
-      <Button type="button" variant={action === "ban" ? "default" : "outline"} className={triggerClassName ?? (action === "ban" ? "h-7 rounded-full bg-red-600 px-2.5 text-xs text-white hover:bg-red-500" : "h-7 rounded-full px-2.5 text-xs")} onClick={() => setOpen(true)}>
+      <Button type="button" variant={action === "ban" ? "destructive" : "outline"} className={triggerClassName ?? "h-7 rounded-full px-2.5 text-xs"} onClick={() => setOpen(true)}>
         {actionText}
       </Button>
       <AdminUserStatusDialog

@@ -16,6 +16,9 @@ export interface PostStreamDisplayItem {
   previewMedia?: PostListPreviewMedia | null
   type?: string
   typeLabel: string
+  status: string
+  statusLabel: string
+  reviewNote?: string | null
   pinScope?: string | null
   pinLabel?: string | null
   hasRedPacket?: boolean
@@ -115,6 +118,9 @@ export function mapSitePostsToDisplayItems(
       previewMedia,
       type: post.type,
       typeLabel: post.typeLabel,
+      status: post.status,
+      statusLabel: post.statusLabel,
+      reviewNote: post.reviewNote ?? null,
       pinScope: post.pinScope,
       pinLabel: getVisiblePinLabel(post.pinScope, visiblePinScopes),
       hasRedPacket: post.hasRedPacket,

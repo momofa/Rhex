@@ -13,6 +13,9 @@ export interface FeedDisplayItem {
   title: string
   type: ForumFeedItem["type"]
   typeLabel: string
+  status: string
+  statusLabel: string
+  reviewNote?: string | null
   pinScope?: string | null
   pinLabel?: string | null
   hasRedPacket: boolean
@@ -97,6 +100,9 @@ export function mapForumFeedItemsToDisplayItems(
       title: item.title,
       type: item.type,
       typeLabel: item.typeLabel,
+      status: item.status,
+      statusLabel: item.statusLabel,
+      reviewNote: item.reviewNote ?? null,
       pinScope: item.pinScope,
       pinLabel: getFeedPinLabel(item.pinScope),
       hasRedPacket: item.hasRedPacket,

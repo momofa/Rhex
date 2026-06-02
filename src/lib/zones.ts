@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache"
 
+import { shouldBypassPublicPostListCache, type PostListVisibilityViewer } from "@/db/post-list-visibility"
 import { resolvePagination } from "@/db/helpers"
 import { countZoneNormalPosts, findAllZonesWithBoards, findGlobalPinnedPosts, findZoneBoardIdsBySlug, findZoneBoardListBySlug, findZoneNormalPosts, findZonePinnedPosts, findZoneWithBoardsBySlug } from "@/db/taxonomy-queries"
 import { dedupeAndMapPinnedPosts, extractPinnedPostIds } from "@/lib/pinned-posts"
@@ -144,6 +145,7 @@ async function readZonePosts(
   page = 1,
   pageSize = 10,
   sort: TaxonomyPostSort = "latest",
+  viewer?: PostListVisibilityViewer | null,
 ): Promise<ZonePostPageResult> {
   const zone = await findZoneBoardIdsBySlug(slug)
 
@@ -162,17 +164,17 @@ async function readZonePosts(
   const anonymousMaskIdentity = await getAnonymousMaskDisplayIdentity()
   const boardIds = zone.boards.map((item: (typeof zone.boards)[number]) => item.id)
   const [globalPinnedPosts, zonePinnedPosts] = await Promise.all([
-    findGlobalPinnedPosts(),
-    findZonePinnedPosts(boardIds),
+    findGlobalPinnedPosts({ viewer }),
+    findZonePinnedPosts(boardIds, undefined, viewer),
   ])
   const pinnedPosts = [...globalPinnedPosts, ...zonePinnedPosts].filter((post) => sort !== "featured" || post.isFeatured)
   const excludedPostIds = extractPinnedPostIds(pinnedPosts)
-  const total = await countZoneNormalPosts(boardIds, excludedPostIds, sort)
+  const total = await countZoneNormalPosts(boardIds, excludedPostIds, sort, viewer)
   const pagination = resolvePagination({ page, pageSize }, total, [pageSize], pageSize)
 
   if (pagination.page === 1) {
     const { pinnedItems, pinnedPostIds } = dedupeAndMapPinnedPosts(pinnedPosts, (post) => mapListPost(post, anonymousMaskIdentity))
-    const normalPosts = await findZoneNormalPosts(boardIds, pinnedPostIds, 1, pagination.pageSize, sort)
+    const normalPosts = await findZoneNormalPosts(boardIds, pinnedPostIds, 1, pagination.pageSize, sort, viewer)
     const items = await applyHookedUserPresentationToSitePosts([
       ...pinnedItems,
       ...normalPosts.map((post) => mapListPost(post, anonymousMaskIdentity)),
@@ -189,7 +191,7 @@ async function readZonePosts(
     }
   }
 
-  const normalPosts = await findZoneNormalPosts(boardIds, excludedPostIds, pagination.page, pagination.pageSize, sort)
+  const normalPosts = await findZoneNormalPosts(boardIds, excludedPostIds, pagination.page, pagination.pageSize, sort, viewer)
   const items = await applyHookedUserPresentationToSitePosts(
     normalPosts.map((post) => mapListPost(post, anonymousMaskIdentity)),
   )
@@ -219,10 +221,11 @@ export async function getZonePosts(
   page = 1,
   pageSize = 10,
   sort: TaxonomyPostSort = "latest",
+  viewer?: PostListVisibilityViewer | null,
 ): Promise<ZonePostPageResult> {
-  if (shouldCacheTaxonomyPostPage(page)) {
+  if (!shouldBypassPublicPostListCache(viewer) && shouldCacheTaxonomyPostPage(page)) {
     return getPersistentZonePosts(slug, page, pageSize, sort)
   }
 
-  return readZonePosts(slug, page, pageSize, sort)
+  return readZonePosts(slug, page, pageSize, sort, viewer)
 }

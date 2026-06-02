@@ -1,3 +1,4 @@
+import { isImageSource, isSvgMarkup } from "@/lib/icon-source"
 import { normalizePostListLoadMode } from "@/lib/post-list-load-mode"
 import type { PostListLoadMode } from "@/lib/post-list-load-mode"
 import { resolveThemeCustomizationSettings } from "@/lib/theme"
@@ -27,6 +28,30 @@ import type {
   SiteThemeCustomizationSettings,
   UserProfileDisplaySettings,
 } from "@/lib/site-settings-app-state.types"
+
+const SIDEBAR_HOME_ICON_TEXT_MAX_LENGTH = 24
+const SIDEBAR_HOME_ICON_SOURCE_MAX_LENGTH = 20000
+
+function normalizeSidebarHomeIcon(value: unknown, fallback: string) {
+  if (typeof value !== "string") {
+    return fallback
+  }
+
+  const normalized = value.trim()
+  if (!normalized) {
+    return fallback
+  }
+
+  if (isSvgMarkup(normalized) || isImageSource(normalized)) {
+    return normalized.length <= SIDEBAR_HOME_ICON_SOURCE_MAX_LENGTH ? normalized : fallback
+  }
+
+  if (normalized.startsWith("<") || normalized.includes("<svg")) {
+    return fallback
+  }
+
+  return normalized.slice(0, SIDEBAR_HOME_ICON_TEXT_MAX_LENGTH)
+}
 
 export function resolveSiteBrandingSettings(options: {
   appStateJson?: string | null
@@ -280,12 +305,12 @@ export function normalizeLeftSidebarHomeSettings(
 ): LeftSidebarHomeSettings {
   const source = isRecord(value) ? value : {}
   const name = typeof source.name === "string" ? source.name.trim().slice(0, 24) : ""
-  const icon = typeof source.icon === "string" ? source.icon.trim().slice(0, 1000) : ""
+  const icon = normalizeSidebarHomeIcon(source.icon, fallback.icon)
 
   return {
     enabled: typeof source.enabled === "boolean" ? source.enabled : fallback.enabled,
     name: name || fallback.name,
-    icon: icon || fallback.icon,
+    icon,
   }
 }
 

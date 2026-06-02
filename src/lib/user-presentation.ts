@@ -21,6 +21,7 @@ export interface PublicUserLevelBadge {
 
 export interface PublicUserVerificationBadge {
   id: string
+  slug?: string | null
   name: string
   color: string
   iconText?: string | null

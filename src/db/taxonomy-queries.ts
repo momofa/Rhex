@@ -1,5 +1,6 @@
 import { prisma } from "@/db/client"
 import { buildHomeVisiblePostWhere } from "@/db/home-feed-visibility"
+import { buildPostListVisibilityWhere, type PostListVisibilityViewer } from "@/db/post-list-visibility"
 import type { Prisma } from "@/db/types"
 import { pinnedPostOrderBy, postListInclude } from "@/db/queries"
 import type { TaxonomyPostSort } from "@/lib/forum-taxonomy-sort"
@@ -223,13 +224,15 @@ function buildTaxonomyPostSortWhere(sort: TaxonomyPostSort): Prisma.PostWhereInp
   return sort === "featured" ? { isFeatured: true } : {}
 }
 
-export function findGlobalPinnedPosts(options?: { pageSize?: number; homeVisibleOnly?: boolean }) {
+export function findGlobalPinnedPosts(options?: { pageSize?: number; homeVisibleOnly?: boolean; viewer?: PostListVisibilityViewer | null }) {
   const normalizedPageSize = typeof options?.pageSize === "number" ? Math.min(Math.max(1, options.pageSize), 50) : undefined
 
   return prisma.post.findMany({
     where: {
-      ...(options?.homeVisibleOnly ? buildHomeVisiblePostWhere() : {}),
-      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
+      AND: [
+        options?.homeVisibleOnly ? buildHomeVisiblePostWhere() : {},
+        buildPostListVisibilityWhere(options?.viewer),
+      ],
       pinScope: "GLOBAL",
     },
     include: taxonomyPostInclude,
@@ -238,12 +241,12 @@ export function findGlobalPinnedPosts(options?: { pageSize?: number; homeVisible
   })
 }
 
-export function findZonePinnedPosts(boardIds: string[], pageSize?: number) {
+export function findZonePinnedPosts(boardIds: string[], pageSize?: number, viewer?: PostListVisibilityViewer | null) {
   const normalizedPageSize = typeof pageSize === "number" ? Math.min(Math.max(1, pageSize), 50) : undefined
 
   return prisma.post.findMany({
     where: {
-      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
+      AND: [buildPostListVisibilityWhere(viewer)],
       pinScope: "ZONE",
       boardId: {
         in: boardIds,
@@ -261,12 +264,13 @@ export function findZoneNormalPosts(
   page: number,
   pageSize: number,
   sort: TaxonomyPostSort = "latest",
+  viewer?: PostListVisibilityViewer | null,
 ) {
   const normalizedPageSize = Math.min(Math.max(1, pageSize), 50)
 
   return prisma.post.findMany({
     where: {
-      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
+      AND: [buildPostListVisibilityWhere(viewer)],
       boardId: {
         in: boardIds,
       },
@@ -284,10 +288,11 @@ export function countZoneNormalPosts(
   boardIds: string[],
   excludedPostIds: string[] = [],
   sort: TaxonomyPostSort = "latest",
+  viewer?: PostListVisibilityViewer | null,
 ) {
   return prisma.post.count({
     where: {
-      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
+      AND: [buildPostListVisibilityWhere(viewer)],
       boardId: {
         in: boardIds,
       },
@@ -297,12 +302,12 @@ export function countZoneNormalPosts(
   })
 }
 
-export function findBoardPinnedPosts(boardId: string, zoneBoardIds: string[], pageSize?: number) {
+export function findBoardPinnedPosts(boardId: string, zoneBoardIds: string[], pageSize?: number, viewer?: PostListVisibilityViewer | null) {
   const normalizedPageSize = typeof pageSize === "number" ? Math.min(Math.max(1, pageSize), 50) : undefined
 
   return prisma.post.findMany({
     where: {
-      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
+      AND: [buildPostListVisibilityWhere(viewer)],
       OR: [
         { pinScope: "GLOBAL" },
         { pinScope: "ZONE", boardId: { in: zoneBoardIds } },
@@ -321,12 +326,13 @@ export function findBoardNormalPosts(
   page: number,
   pageSize: number,
   sort: TaxonomyPostSort = "latest",
+  viewer?: PostListVisibilityViewer | null,
 ) {
   const normalizedPageSize = Math.min(Math.max(1, pageSize), 50)
 
   return prisma.post.findMany({
     where: {
-      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
+      AND: [buildPostListVisibilityWhere(viewer)],
       boardId,
       ...buildTaxonomyPostSortWhere(sort),
       id: excludedPostIds.length > 0 ? { notIn: excludedPostIds } : undefined,
@@ -342,10 +348,11 @@ export function countBoardNormalPosts(
   boardId: string,
   excludedPostIds: string[] = [],
   sort: TaxonomyPostSort = "latest",
+  viewer?: PostListVisibilityViewer | null,
 ) {
   return prisma.post.count({
     where: {
-      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
+      AND: [buildPostListVisibilityWhere(viewer)],
       boardId,
       ...buildTaxonomyPostSortWhere(sort),
       id: excludedPostIds.length > 0 ? { notIn: excludedPostIds } : undefined,

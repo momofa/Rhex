@@ -61,6 +61,7 @@ type ListPostAuthor = Pick<User, "id" | "username" | "nickname" | "avatarPath" |
     customDescription?: string | null
     type: {
       id: string
+      slug?: string | null
       name: string
       color: string
       iconText?: string | null

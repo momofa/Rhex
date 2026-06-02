@@ -58,6 +58,7 @@ export interface SiteUserProfile {
   inviterUsername?: string | null
   verification?: {
     id: string
+    slug?: string | null
     name: string
     color: string
     iconText?: string | null
@@ -141,6 +142,7 @@ export async function getUserProfile(username: string): Promise<SiteUserProfile 
       verification: approvedVerification
         ? {
             id: approvedVerification.type.id,
+            slug: approvedVerification.type.slug,
             name: approvedVerification.type.name,
             color: approvedVerification.type.color,
             iconText: approvedVerification.type.iconText,

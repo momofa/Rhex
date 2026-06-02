@@ -205,11 +205,6 @@ export async function tipRssEntry(input: {
       apiError(404, "用户不存在")
     }
 
-    const requiredAmount = Math.max(input.amount, Math.abs(prepared.finalDelta))
-    if (sender.points < requiredAmount) {
-      apiError(400, `${settings.pointName}不足，无法完成打赏`)
-    }
-
     const [usedDailyCount, usedEntryCount] = await Promise.all([
       countRssEntryTipsBySender({ senderId: sender.id, start, end, client: tx }),
       countRssEntryTipsBySender({ senderId: sender.id, entryId: publicEntry.id, client: tx }),

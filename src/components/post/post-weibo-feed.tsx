@@ -12,6 +12,7 @@ import {
   PostAccessBadges,
   PostPinBadge,
   PostRewardPoolIcon,
+  PostStatusBadge,
   PostTypeBadge,
 } from "@/components/post/post-list-shared"
 import { PostTipPanel } from "@/components/post/post-tip-panel"
@@ -337,6 +338,7 @@ export function PostWeiboFeed({ items, showBoard = true, postLinkDisplayMode = "
                     </Link>
                   ) : null}
                   <PostTypeBadge type={item.type} label={item.typeLabel} compact />
+                  <PostStatusBadge status={item.status} label={item.statusLabel} reviewNote={item.reviewNote} compact />
                   {showPinBadge ? <PostPinBadge scope={item.pinScope} label={item.pinLabel} compact /> : null}
                   {item.isFeatured ? <span className="rounded-full border border-border bg-secondary px-2 py-0.5 text-[11px] text-secondary-foreground">精华</span> : null}
                   <TimeTooltip value={item.metaPrimaryRaw}>

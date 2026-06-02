@@ -1,20 +1,27 @@
 import {
   createUserVerificationApplication,
   findApprovedUserVerification,
+  findActiveVerificationTypeBySlug,
   findLatestUserVerificationApplication,
   findVerificationTypeById,
   listActiveVerificationTypes,
   listUserVerificationApplications,
   updateUserVerificationById,
 } from "@/db/verification-queries"
+import { prisma } from "@/db/client"
 import { getCurrentUser } from "@/lib/auth"
 import { enforceSensitiveText } from "@/lib/content-safety"
 import { isSvgMarkup } from "@/lib/icon-source"
+import { applyPointDelta, prepareScopedPointDelta } from "@/lib/point-center"
+import { POINT_LOG_EVENT_TYPES } from "@/lib/point-log-events"
+import { getSiteSettings } from "@/lib/site-settings"
+import { revalidateUserSurfaceCache } from "@/lib/user-surface"
 import { parseVerificationFormSchema, type VerificationFormField } from "@/lib/verification-form-schema"
 export type { VerificationFieldType, VerificationFormField } from "@/lib/verification-form-schema"
 
 export type VerificationBadgeView = {
   id: string
+  slug: string
   name: string
   iconText: string
   customIconText?: string | null
@@ -47,9 +54,29 @@ export type VerificationTypeListItem = {
   sortOrder: number
   status: boolean
   userLimit: number
+  pointsCost: number
   allowResubmitAfterReject: boolean
   formFields: VerificationFormField[]
   currentApplication?: UserVerificationView | null
+}
+
+export type VerificationTypeDetail = {
+  id: string
+  name: string
+  slug: string
+  description?: string | null
+  iconText: string
+  color: string
+  sortOrder: number
+  status: boolean
+  userLimit: number
+  pointsCost: number
+  allowResubmitAfterReject: boolean
+  needRemark: boolean
+  formFields: VerificationFormField[]
+  approvedUserCount: number
+  createdAt: string
+  updatedAt: string
 }
 
 export type CurrentUserVerificationData = {
@@ -124,6 +151,7 @@ function mapVerificationType(type: {
   sortOrder: number
   status: boolean
   userLimit: number
+  pointsCost: number
   allowResubmitAfterReject: boolean
 }) {
   return {
@@ -137,6 +165,7 @@ function mapVerificationType(type: {
     sortOrder: type.sortOrder,
     status: type.status,
     userLimit: type.userLimit,
+    pointsCost: type.pointsCost,
     allowResubmitAfterReject: type.allowResubmitAfterReject,
   }
 }
@@ -154,6 +183,7 @@ function mapApplication(application: {
   formResponseJson?: string | null
   type: {
     id: string
+    slug: string
     name: string
     iconText: string | null
     color: string
@@ -173,6 +203,7 @@ function mapApplication(application: {
     formResponse: parseFormResponseJson(application.formResponseJson),
     type: {
       id: application.type.id,
+      slug: application.type.slug,
       name: application.type.name,
       iconText: application.type.iconText?.trim() || "✔️",
       color: application.type.color,
@@ -211,6 +242,7 @@ export async function getCurrentUserVerificationData(): Promise<CurrentUserVerif
     approvedVerification: approvedVerification
       ? {
           id: approvedVerification.type.id,
+          slug: approvedVerification.type.slug,
           name: approvedVerification.type.name,
           iconText: approvedVerification.type.iconText?.trim() || "✔️",
           customIconText: approvedVerification.customIconText,
@@ -321,14 +353,72 @@ export async function submitVerificationApplication(input: {
     throw new Error(formFields.length > 0 ? "请完善认证申请表单" : "请填写申请说明")
   }
 
-  const application = await createUserVerificationApplication({
-    userId: input.userId,
-    verificationTypeId: input.verificationTypeId,
-    content,
-    customIconText: customIconText || null,
-    customDescription: customDescriptionSafety?.sanitizedText || null,
-    formResponseJson: formFields.length > 0 ? JSON.stringify(sanitizedFormResponse) : null,
+  const shouldChargePoints = !approvedSameTypeApplication && verificationType.pointsCost > 0
+  const settings = shouldChargePoints ? await getSiteSettings() : null
+  const preparedApplicationCost = shouldChargePoints
+    ? await prepareScopedPointDelta({
+        scopeKey: "VERIFICATION_APPLICATION",
+        baseDelta: -verificationType.pointsCost,
+        userId: input.userId,
+      })
+    : null
+
+  const application = await prisma.$transaction(async (tx) => {
+    const latestUser = await tx.user.findUnique({
+      where: { id: input.userId },
+      select: { id: true, points: true },
+    })
+
+    if (!latestUser) {
+      throw new Error("用户不存在")
+    }
+
+    const latestApplicationInTx = await tx.userVerification.findFirst({
+      where: {
+        userId: input.userId,
+        typeId: input.verificationTypeId,
+      },
+      orderBy: [{ submittedAt: "desc" }],
+    })
+
+    if (latestApplicationInTx?.status === "PENDING") {
+      throw new Error("该认证已在审核中，请等待后台审核")
+    }
+
+    const createdApplication = await createUserVerificationApplication({
+      userId: input.userId,
+      verificationTypeId: input.verificationTypeId,
+      content,
+      customIconText: customIconText || null,
+      customDescription: customDescriptionSafety?.sanitizedText || null,
+      formResponseJson: formFields.length > 0 ? JSON.stringify(sanitizedFormResponse) : null,
+      client: tx,
+    })
+
+    if (preparedApplicationCost && settings) {
+      await applyPointDelta({
+        tx,
+        userId: input.userId,
+        beforeBalance: latestUser.points,
+        prepared: preparedApplicationCost,
+        pointName: settings.pointName,
+        insufficientMessage: `${settings.pointName}不足，无法提交${verificationType.name}认证申请`,
+        reason: `提交${verificationType.name}认证申请`,
+        eventType: POINT_LOG_EVENT_TYPES.VERIFICATION_APPLICATION,
+        eventData: {
+          verificationTypeId: verificationType.id,
+          verificationTypeName: verificationType.name,
+          pointsCost: verificationType.pointsCost,
+        },
+      })
+    }
+
+    return createdApplication
   })
+
+  if (preparedApplicationCost) {
+    revalidateUserSurfaceCache(input.userId)
+  }
 
   return {
     ...application,
@@ -337,6 +427,40 @@ export async function submitVerificationApplication(input: {
       || customDescriptionSafety?.wasReplaced
       || Object.keys(effectiveRawFormResponse).some((key) => sanitizedFormResponse[key] !== effectiveRawFormResponse[key]),
     ),
+  }
+}
+
+export async function getVerificationTypeDetailBySlug(slug: string): Promise<VerificationTypeDetail | null> {
+  const normalizedSlug = slug.trim()
+  if (!normalizedSlug) {
+    return null
+  }
+
+  const verificationType = await findActiveVerificationTypeBySlug(normalizedSlug)
+  if (!verificationType) {
+    return null
+  }
+
+  return {
+    id: verificationType.id,
+    name: verificationType.name,
+    slug: verificationType.slug,
+    description: verificationType.description,
+    iconText: verificationType.iconText?.trim() || "✔️",
+    color: verificationType.color,
+    formFields: parseVerificationFormSchema(verificationType.formSchemaJson, {
+      allowFallbackLabel: true,
+      coerceInvalidType: true,
+    }),
+    sortOrder: verificationType.sortOrder,
+    status: verificationType.status,
+    userLimit: verificationType.userLimit,
+    pointsCost: verificationType.pointsCost,
+    allowResubmitAfterReject: verificationType.allowResubmitAfterReject,
+    needRemark: verificationType.needRemark,
+    approvedUserCount: verificationType._count.applications,
+    createdAt: verificationType.createdAt.toISOString(),
+    updatedAt: verificationType.updatedAt.toISOString(),
   }
 }
 
@@ -367,6 +491,7 @@ export async function getUserApprovedVerificationBadge(userId: number | null | u
 
   return {
     id: application.type.id,
+    slug: application.type.slug,
     name: application.type.name,
     iconText: application.type.iconText?.trim() || "✔️",
     customIconText: application.customIconText,

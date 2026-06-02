@@ -1,6 +1,8 @@
 import { apiSuccess, createUserRouteHandler, readJsonBody, readOptionalStringField, requireStringField } from "@/lib/api-route"
 import { logRouteWriteSuccess } from "@/lib/route-metadata"
 import { submitVerificationApplication } from "@/lib/verifications"
+import { withRequestWriteGuard } from "@/lib/write-guard"
+import { createRequestWriteGuardOptions } from "@/lib/write-guard-policies"
 
 export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
   const body = await readJsonBody(request)
@@ -12,32 +14,44 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     ? Object.fromEntries(Object.entries(body.formResponse as Record<string, unknown>).map(([key, value]) => [key, String(value ?? "")]))
     : undefined
 
-  const application = await submitVerificationApplication({
+  return withRequestWriteGuard(createRequestWriteGuardOptions("verification-application-submit", {
+    request,
     userId: currentUser.id,
-    verificationTypeId,
-    content,
-    customIconText,
-    customDescription,
-    formResponse,
-  })
-
-  logRouteWriteSuccess({
-    scope: "verifications-apply",
-    action: "submit-verification-application",
-  }, {
-    userId: currentUser.id,
-    targetId: application.id,
-    extra: {
+    input: {
       verificationTypeId,
-      status: application.status,
-      contentAdjusted: application.contentAdjusted,
+      content,
+      customIconText,
+      customDescription,
+      formResponse,
     },
-  })
+  }), async () => {
+    const application = await submitVerificationApplication({
+      userId: currentUser.id,
+      verificationTypeId,
+      content,
+      customIconText,
+      customDescription,
+      formResponse,
+    })
 
-  return apiSuccess({
-    id: application.id,
-    status: application.status,
-  }, application.contentAdjusted ? "认证申请已提交，部分内容已自动替换，请等待后台审核" : "认证申请已提交，请等待后台审核")
+    logRouteWriteSuccess({
+      scope: "verifications-apply",
+      action: "submit-verification-application",
+    }, {
+      userId: currentUser.id,
+      targetId: application.id,
+      extra: {
+        verificationTypeId,
+        status: application.status,
+        contentAdjusted: application.contentAdjusted,
+      },
+    })
+
+    return apiSuccess({
+      id: application.id,
+      status: application.status,
+    }, application.contentAdjusted ? "认证申请已提交，部分内容已自动替换，请等待后台审核" : "认证申请已提交，请等待后台审核")
+  })
 }, {
   errorMessage: "提交失败",
   logPrefix: "[api/verifications/apply] unexpected error",

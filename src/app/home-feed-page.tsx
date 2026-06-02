@@ -49,6 +49,7 @@ import { groupHomeSidebarPanels } from "@/lib/home-sidebar-layout"
 import { getHomeSidebarStats } from "@/lib/home-sidebar-stats"
 import { POST_LIST_LOAD_MODE_INFINITE } from "@/lib/post-list-load-mode"
 import { attachPostListTipSummaries } from "@/lib/post-list-tipping"
+import { resolveAdminActorFromSessionUser } from "@/lib/moderator-permissions"
 import { getRssHomeDisplaySettings } from "@/lib/rss-harvest"
 import { getRssUniverseFeedPage } from "@/lib/rss-public-feed"
 import {
@@ -211,6 +212,10 @@ export async function HomeFeedPage({
   }
 
   const addonHookSearchParams = buildAddonHookSearchParams(resolvedSearchParams)
+  const postListViewer = {
+    userId: currentUser?.id ?? null,
+    adminActor: await resolveAdminActorFromSessionUser(currentUser),
+  }
   const postFeedPage =
     currentSort && currentSort !== "universe"
       ? await getLatestFeed(
@@ -219,6 +224,7 @@ export async function HomeFeedPage({
           currentSort,
           currentUser?.id,
           settings.homeHotRecentWindowHours,
+          postListViewer,
         )
       : null
   const universeFeedPage =

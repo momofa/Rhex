@@ -148,6 +148,48 @@ export function PostTypeBadge({
   )
 }
 
+export function PostStatusBadge({
+  status,
+  label,
+  reviewNote,
+  compact = false,
+  className,
+}: {
+  status?: string | null
+  label?: string | null
+  reviewNote?: string | null
+  compact?: boolean
+  className?: string
+}) {
+  if (!status || status === "NORMAL") {
+    return null
+  }
+
+  const resolvedLabel = label?.trim() || (status === "PENDING" ? "待审核" : status === "OFFLINE" ? "已下线" : status === "LOCKED" ? "已关闭回复" : status)
+  const note = reviewNote?.trim()
+  const toneClassName = status === "PENDING"
+    ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-200"
+    : status === "OFFLINE"
+      ? "border-slate-500/30 bg-slate-500/10 text-slate-700 dark:text-slate-200"
+      : "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-200"
+
+  return (
+    <Tooltip content={note ? `${resolvedLabel}：${note}` : resolvedLabel}>
+      <Badge
+        variant="outline"
+        className={cn(
+          "rounded-full font-medium",
+          compact ? "px-1.5 text-[10px] sm:px-2 sm:text-[11px]" : "px-2 sm:px-2.5",
+          toneClassName,
+          className,
+        )}
+      >
+        {resolvedLabel}
+      </Badge>
+    </Tooltip>
+  )
+}
+
 export function PostPinBadge({
   scope,
   label,

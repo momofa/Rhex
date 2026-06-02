@@ -12,13 +12,14 @@ interface AdminPostActionButtonProps {
   targetId: string
   label: string
   className?: string
-  variant?: "default" | "outline" | "ghost"
+  variant?: "default" | "outline" | "ghost" | "destructive"
   tone?: "default" | "danger"
   payload?: Record<string, unknown>
   modalTitle?: string
   modalDescription?: string
   placeholder?: string
   confirmText?: string
+  messageRequired?: boolean
   open?: boolean
   onOpenChange?: (open: boolean) => void
   hideTrigger?: boolean
@@ -36,6 +37,7 @@ export function AdminPostActionButton({
   modalDescription,
   placeholder,
   confirmText,
+  messageRequired = false,
   open: controlledOpen,
   onOpenChange,
   hideTrigger = false,
@@ -43,6 +45,7 @@ export function AdminPostActionButton({
   const router = useRouter()
   const [internalOpen, setInternalOpen] = useState(false)
   const [message, setMessage] = useState("")
+  const [error, setError] = useState("")
   const [isPending, startTransition] = useTransition()
   const autoSubmittedRef = useRef(false)
   const isControlled = controlledOpen !== undefined
@@ -52,10 +55,19 @@ export function AdminPostActionButton({
     if (!isControlled) {
       setInternalOpen(nextOpen)
     }
+    if (!nextOpen) {
+      setMessage("")
+      setError("")
+    }
     onOpenChange?.(nextOpen)
   }, [isControlled, onOpenChange])
 
   const submit = useCallback(() => {
+    if (messageRequired && !message.trim()) {
+      setError("请填写原因")
+      return
+    }
+
     startTransition(async () => {
       const response = await fetch("/api/admin/actions", {
         method: "POST",
@@ -66,10 +78,11 @@ export function AdminPostActionButton({
       if (response.ok) {
         setOpen(false)
         setMessage("")
+        setError("")
         router.refresh()
       }
     })
-  }, [action, message, payload, router, setOpen, startTransition, targetId])
+  }, [action, message, messageRequired, payload, router, setOpen, startTransition, targetId])
 
   useEffect(() => {
     if (!hideTrigger || modalTitle || placeholder) {
@@ -94,8 +107,8 @@ export function AdminPostActionButton({
       {!hideTrigger ? (
         <Button
           type="button"
-          variant={variant}
-          className={className ?? (tone === "danger" ? "h-7 rounded-full bg-red-600 px-2.5 text-xs text-white hover:bg-red-500" : "h-7 rounded-full px-2.5 text-xs")}
+          variant={tone === "danger" ? "destructive" : variant}
+          className={className ?? "h-7 rounded-full px-2.5 text-xs"}
           onClick={() => {
             if (!modalTitle && !placeholder) {
               submit()
@@ -116,7 +129,7 @@ export function AdminPostActionButton({
         description={modalDescription}
         footer={
           <div className="flex items-center gap-2">
-            <Button type="button" disabled={isPending} className={tone === "danger" ? "h-9 rounded-full bg-red-600 px-4 text-xs text-white hover:bg-red-500" : "h-9 rounded-full px-4 text-xs"} onClick={submit}>
+            <Button type="button" variant={tone === "danger" ? "destructive" : "default"} disabled={isPending} className="h-9 rounded-full px-4 text-xs" onClick={submit}>
               {isPending ? "处理中..." : confirmText ?? label}
             </Button>
             <Button type="button" variant="ghost" className="h-9 px-3 text-xs" onClick={() => setOpen(false)}>
@@ -128,13 +141,16 @@ export function AdminPostActionButton({
         {placeholder ? (
           <Textarea
             value={message}
-            onChange={(event) => setMessage(event.target.value)}
+            onChange={(event) => {
+              setMessage(event.target.value)
+              setError("")
+            }}
             placeholder={placeholder}
             className="min-h-[120px] rounded-xl bg-background px-4 py-3"
           />
         ) : null}
+        {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
       </Modal>
     </>
   )
 }
-

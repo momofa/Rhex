@@ -38,6 +38,7 @@ function mapAnonymousIdentity(user: AnonymousMaskUserRecord): AnonymousDisplayId
     authorVerification: user.verificationApplications?.[0]
         ? {
             id: user.verificationApplications[0].type.id,
+            slug: user.verificationApplications[0].type.slug,
             name: user.verificationApplications[0].type.name,
             color: user.verificationApplications[0].type.color,
             iconText: user.verificationApplications[0].type.iconText,

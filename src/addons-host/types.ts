@@ -451,6 +451,8 @@ export const ADDON_ASYNC_WATERFALL_HOOK_NAMES = [
   "sitemap.entries",
   "post.related.items",
   "post.content.render",
+  "points.settlement.resolve",
+  "post.tip.summary",
 ] as const
 
 export type AddonActionHookName = (typeof ADDON_ACTION_HOOK_NAMES)[number]
@@ -773,6 +775,7 @@ export interface AddonPublicUserLevelBadge {
 
 export interface AddonPublicUserVerificationBadge {
   id: string
+  slug?: string | null
   name: string
   color: string
   iconText?: string | null
@@ -1333,6 +1336,44 @@ export interface AddonPointAdjustResult {
 
 export interface AddonPointsApi {
   adjust: (input: AddonPointAdjustInput) => Promise<AddonPointAdjustResult>
+}
+
+export interface AddonPointSettlementValue {
+  handled: boolean
+  userId: number
+  beforeBalance: number
+  afterBalance?: number | null
+  baseDelta: number
+  finalDelta: number
+  scopeKey: string
+  pointName: string
+  reason: string
+  eventType?: string | null
+  eventData?: unknown
+  relatedType?: string | null
+  relatedId?: string | null
+  insufficientMessage?: string | null
+  currencyCode?: string
+  currencyName?: string
+  metadata?: Record<string, unknown>
+}
+
+export interface AddonTipSummaryValue {
+  enabled: boolean
+  isLoggedIn: boolean
+  pointName: string
+  currentUserPoints: number
+  gifts: unknown[]
+  giftStats: unknown[]
+  recentGiftEvents: unknown[]
+  allowedAmounts: number[]
+  dailyLimit: number
+  perPostLimit: number
+  usedDailyCount: number
+  usedPostCount: number
+  tipCount: number
+  tipTotalPoints: number
+  topSupporters: unknown[]
 }
 
 export interface AddonBadgeSummary {
@@ -1991,6 +2032,8 @@ export interface AddonAsyncWaterfallHookValueMap {
   }>
   "post.related.items": AddonPostRecord[]
   "post.content.render": string
+  "points.settlement.resolve": AddonPointSettlementValue
+  "post.tip.summary": AddonTipSummaryValue
 }
 
 export interface AddonAsyncWaterfallHookPayloadMap {
@@ -2024,6 +2067,15 @@ export interface AddonAsyncWaterfallHookPayloadMap {
   }
   "post.related.items": {
     postId: string
+  }
+  "points.settlement.resolve": {
+    source: "applyPointDelta"
+  }
+  "post.tip.summary": {
+    targetType: "post" | "comment"
+    postId?: string
+    commentId?: string
+    currentUserId?: number
   }
 }
 

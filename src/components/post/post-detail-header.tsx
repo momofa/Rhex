@@ -2,7 +2,7 @@ import Link from "next/link"
 import { ChevronDown, ChevronRight } from "lucide-react"
 
 import { AddonSlotRenderer, AddonSurfaceRenderer } from "@/addons-host"
-import { PostTypeBadge } from "@/components/post/post-list-shared"
+import { PostStatusBadge, PostTypeBadge } from "@/components/post/post-list-shared"
 import { LevelIcon } from "@/components/level-icon"
 import { TimeTooltip } from "@/components/time-tooltip"
 import { AiAgentIndicator } from "@/components/user/ai-agent-indicator"
@@ -43,6 +43,9 @@ interface PostDetailHeaderProps {
     publishedAtRaw?: string
     type?: string
     typeLabel: string
+    status?: string
+    statusLabel?: string
+    reviewNote?: string | null
     isPinned: boolean
     isFeatured: boolean
     stats: {
@@ -91,21 +94,28 @@ interface PostDetailHeaderBadgesSurfaceProps
 function PostStateBadges({
   type,
   typeLabel,
+  status,
+  statusLabel,
+  reviewNote,
   isPinned,
   isFeatured,
 }: {
   type?: string
   typeLabel: string
+  status?: string
+  statusLabel?: string
+  reviewNote?: string | null
   isPinned: boolean
   isFeatured: boolean
 }) {
-  if (type === "NORMAL" && !isPinned && !isFeatured) {
+  if (type === "NORMAL" && (!status || status === "NORMAL") && !isPinned && !isFeatured) {
     return null
   }
 
   return (
     <div className="flex flex-wrap items-center gap-1">
       <PostTypeBadge type={type} label={typeLabel} compact />
+      <PostStatusBadge status={status} label={statusLabel} reviewNote={reviewNote} compact />
       {isPinned ? (
         <span className="rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] text-orange-700 dark:bg-orange-500/15 dark:text-orange-200 sm:px-2 sm:text-[11px]">
           置顶
@@ -458,6 +468,9 @@ export function PostDetailHeader({
                 <PostStateBadges
                   type={post.type}
                   typeLabel={post.typeLabel}
+                  status={post.status}
+                  statusLabel={post.statusLabel}
+                  reviewNote={post.reviewNote}
                   isPinned={post.isPinned}
                   isFeatured={post.isFeatured}
                 />

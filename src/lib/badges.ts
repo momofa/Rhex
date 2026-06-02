@@ -146,6 +146,7 @@ export async function getBadgeEligibilitySnapshot(userId: number): Promise<Badge
     currentCheckInStreak: progress?.currentCheckInStreak ?? 0,
     maxCheckInStreak: progress?.maxCheckInStreak ?? 0,
     vipLevel: user.vipLevel,
+    approvedVerificationTypeIds: user.verificationApplications.map((item) => item.typeId),
   }
 }
 

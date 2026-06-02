@@ -6,6 +6,7 @@ import { Modal } from "@/components/ui/modal"
 import { AdminUserStatusModal } from "@/components/admin/admin-user-status-modal"
 import { BoardSelectField, type BoardSelectGroup } from "@/components/board/board-select-field"
 import { Button } from "@/components/ui/rbutton"
+import { Textarea } from "@/components/ui/textarea"
 import { getPostPath } from "@/lib/post-links"
 import type { PostLinkDisplayMode } from "@/lib/site-settings"
 
@@ -32,6 +33,11 @@ interface AdminQuickAction {
   label: string
   tone?: "danger"
   extra?: Record<string, unknown>
+  modalTitle?: string
+  modalDescription?: string
+  placeholder?: string
+  confirmText?: string
+  messageRequired?: boolean
 }
 
 export function PostAdminPanel({
@@ -45,7 +51,6 @@ export function PostAdminPanel({
   postAuthorStatus,
   postStatus,
   isPinned,
-  
   isFeatured,
   boardOptions,
   postLinkDisplayMode = "SLUG",
@@ -53,6 +58,9 @@ export function PostAdminPanel({
   const [feedback, setFeedback] = useState("")
   const [moveBoardSlug, setMoveBoardSlug] = useState(currentBoardSlug)
   const [moveDialogOpen, setMoveDialogOpen] = useState(false)
+  const [confirmAction, setConfirmAction] = useState<AdminQuickAction | null>(null)
+  const [confirmMessage, setConfirmMessage] = useState("")
+  const [confirmError, setConfirmError] = useState("")
   const [pendingAction, startTransition] = useTransition()
 
   const currentBoardLabel = useMemo(() => {
@@ -132,6 +140,41 @@ export function PostAdminPanel({
     void runAction("post.moveBoard", postId, { boardSlug: moveBoardSlug })
   }
 
+  function openConfirmAction(item: AdminQuickAction) {
+    setConfirmAction(item)
+    setConfirmMessage("")
+    setConfirmError("")
+  }
+
+  function runQuickAction(item: AdminQuickAction) {
+    if (item.modalTitle || item.placeholder) {
+      openConfirmAction(item)
+      return
+    }
+
+    void runAction(item.action, item.targetId, item.extra)
+  }
+
+  function submitConfirmAction() {
+    if (!confirmAction) {
+      return
+    }
+
+    const message = confirmMessage.trim()
+    if (confirmAction.messageRequired && !message) {
+      setConfirmError("请填写原因")
+      return
+    }
+
+    setConfirmAction(null)
+    setConfirmMessage("")
+    setConfirmError("")
+    void runAction(confirmAction.action, confirmAction.targetId, {
+      ...confirmAction.extra,
+      ...(message ? { message } : {}),
+    })
+  }
+
   const canEditPostContent = actorRole === "ADMIN"
   const userActions: AdminQuickAction[] = postAuthorStatus === "BANNED"
     ? (actorRole === "ADMIN" ? [{ action: "user.activate", targetId: String(postAuthorId), label: "解除封禁" }] : [])
@@ -157,21 +200,59 @@ export function PostAdminPanel({
           extra: { scope },
         }))
 
+  const reviewActions: AdminQuickAction[] = postStatus === "PENDING"
+    ? [
+        { action: "post.approve", targetId: postId, label: "审核通过" },
+        {
+          action: "post.reject",
+          targetId: postId,
+          label: "驳回帖子",
+          tone: "danger",
+          modalTitle: "驳回帖子审核",
+          modalDescription: "帖子会转为已下线状态，仅作者和管理员可见。驳回原因会展示给作者。",
+          placeholder: "填写驳回原因，例如：内容不符合当前节点规则。",
+          confirmText: "确认驳回",
+          messageRequired: true,
+        },
+      ]
+    : []
+
   const postStatusActions: AdminQuickAction[] = postStatus === "OFFLINE"
     ? [{ action: "post.show", targetId: postId, label: "上线帖子" }]
+    : postStatus === "PENDING"
+      ? []
     : [
         postStatus === "LOCKED"
           ? { action: "post.unlock", targetId: postId, label: "开放回复" }
           : { action: "post.lock", targetId: postId, label: "关闭回复" },
-        { action: "post.hide", targetId: postId, label: "下线帖子", tone: "danger" as const },
+        {
+          action: "post.hide",
+          targetId: postId,
+          label: "下线帖子",
+          tone: "danger" as const,
+          modalTitle: "下线帖子",
+          modalDescription: "帖子下线后仅作者和管理员可见。填写原因后会展示给作者。",
+          placeholder: "填写下线原因，例如：内容过期、违规或需作者修改。",
+          confirmText: "确认下线",
+        },
       ]
 
   const actions: AdminQuickAction[] = [
+    ...reviewActions,
     ...pinActions,
     { action: "post.feature", targetId: postId, label: isFeatured ? "取消精华" : "设为精华" },
     ...userActions,
     ...postStatusActions,
-    { action: "post.delete", targetId: postId, label: "删除帖子", tone: "danger" as const },
+    {
+      action: "post.delete",
+      targetId: postId,
+      label: "删除帖子",
+      tone: "danger" as const,
+      modalTitle: "确认删除帖子",
+      modalDescription: "删除后帖子、回复和相关互动数据会被永久移除，无法恢复。",
+      placeholder: "可选：填写删除原因，便于记录后台日志。",
+      confirmText: "确认删除",
+    },
   ]
 
   return (
@@ -194,9 +275,9 @@ export function PostAdminPanel({
         {actions.map((item) => (
           <Button
             key={`${item.action}-${item.label}`}
-            variant="outline"
-            className={item.tone === "danger" ? "h-8 border-red-200 px-3 text-xs text-red-600 hover:bg-red-50 hover:text-red-700" : "h-8 px-3 text-xs"}
-            onClick={() => runAction(item.action, item.targetId, item.extra)}
+            variant={item.tone === "danger" ? "destructive" : "outline"}
+            className="h-8 px-3 text-xs"
+            onClick={() => runQuickAction(item)}
             disabled={pendingAction}
           >
             {item.label}
@@ -217,7 +298,7 @@ export function PostAdminPanel({
             username={postAuthorUsername}
             action="ban"
             postId={postId}
-            triggerClassName="h-8 rounded-lg border border-red-200 bg-background px-3 text-xs text-red-600 hover:bg-red-50 hover:text-red-700"
+            triggerClassName="h-8 rounded-lg px-3 text-xs"
           />
         ) : null}
       </div>
@@ -239,7 +320,7 @@ export function PostAdminPanel({
           </div>
         )}
       >
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4">
           <div className="rounded-[18px] border border-border bg-card/60 p-4 text-sm text-muted-foreground">
             <p>当前节点：{currentBoardLabel || "未知节点"}</p>
             <p className="mt-1">目标节点：{selectedMoveBoardLabel || "请选择目标节点"}</p>
@@ -252,6 +333,51 @@ export function PostAdminPanel({
             title="选择目标节点"
             description="支持按分区、节点名或 slug 搜索，确认后帖子将移动到所选节点。"
           />
+        </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(confirmAction)}
+        title={confirmAction?.modalTitle ?? "确认操作"}
+        description={confirmAction?.modalDescription}
+        onClose={() => {
+          if (!pendingAction) {
+            setConfirmAction(null)
+            setConfirmMessage("")
+            setConfirmError("")
+          }
+        }}
+        footer={(
+          <div className="flex items-center justify-end gap-2">
+            <Button type="button" variant="ghost" className="h-9 px-4 text-sm" onClick={() => setConfirmAction(null)} disabled={pendingAction}>
+              取消
+            </Button>
+            <Button
+              type="button"
+              variant={confirmAction?.tone === "danger" ? "destructive" : "default"}
+              className="h-9 px-4 text-sm"
+              onClick={submitConfirmAction}
+              disabled={pendingAction}
+            >
+              {pendingAction ? "处理中..." : confirmAction?.confirmText ?? "确认"}
+            </Button>
+          </div>
+        )}
+      >
+        <div className="flex flex-col gap-3">
+          {confirmAction?.placeholder ? (
+            <Textarea
+              value={confirmMessage}
+              onChange={(event) => {
+                setConfirmMessage(event.target.value)
+                setConfirmError("")
+              }}
+              placeholder={confirmAction.placeholder}
+              className="min-h-[120px] rounded-xl bg-card px-4 py-3 text-sm"
+              disabled={pendingAction}
+            />
+          ) : null}
+          {confirmError ? <p className="text-sm text-destructive">{confirmError}</p> : null}
         </div>
       </Modal>
     </div>

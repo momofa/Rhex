@@ -1,8 +1,12 @@
 import { prisma } from "@/db/client"
+import type { Prisma } from "@/db/types"
+
+type VerificationQueryClient = Prisma.TransactionClient | typeof prisma
 
 const verificationApplicationTypeSelect = {
   id: true,
   name: true,
+  slug: true,
   iconText: true,
   color: true,
   description: true,
@@ -45,6 +49,26 @@ export function findVerificationTypeById(verificationTypeId: string) {
   })
 }
 
+export function findActiveVerificationTypeBySlug(slug: string) {
+  return prisma.verificationType.findFirst({
+    where: {
+      slug,
+      status: true,
+    },
+    include: {
+      _count: {
+        select: {
+          applications: {
+            where: {
+              status: "APPROVED",
+            },
+          },
+        },
+      },
+    },
+  })
+}
+
 export function findLatestUserVerificationApplication(userId: number, typeId: string) {
   return prisma.userVerification.findFirst({
     where: {
@@ -62,8 +86,10 @@ export function createUserVerificationApplication(input: {
   customIconText: string | null
   customDescription: string | null
   formResponseJson: string | null
+  client?: VerificationQueryClient
 }) {
-  return prisma.userVerification.create({
+  const client = input.client ?? prisma
+  return client.userVerification.create({
     data: {
       userId: input.userId,
       typeId: input.verificationTypeId,

@@ -59,6 +59,12 @@ export function findBadgeEligibilityUserSnapshot(userId: number) {
         acceptedAnswerCount: true,
         level: true,
         vipLevel: true,
+        verificationApplications: {
+          where: { status: "APPROVED" },
+          select: {
+            typeId: true,
+          },
+        },
         _count: {
           select: {
             followedByUsers: true,

@@ -1,7 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { Filter, Inbox, MailOpen, MessageSquare, RotateCcw, Users } from "lucide-react"
+import { Filter, Inbox, MailOpen, MessageSquare, RotateCcw, Trash2, Users } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
 
 import {
@@ -46,12 +47,15 @@ const sortOptions = [
 const pageSizeOptions = [20, 50, 100]
 
 export function AdminMessageRecords({ data }: AdminMessageRecordsProps) {
+  const router = useRouter()
   const [filters, setFilters] = useState({
     keyword: data.filters.keyword,
     sort: data.filters.sort,
     pageSize: String(data.pagination.pageSize),
     detailPageSize: String(data.filters.detailPageSize),
   })
+  const [isDeletingReadSystemNotifications, setIsDeletingReadSystemNotifications] = useState(false)
+  const [deleteReadSystemNotificationsMessage, setDeleteReadSystemNotificationsMessage] = useState("")
 
   const activeFilterBadges = useMemo(() => {
     const badges: string[] = []
@@ -141,6 +145,38 @@ export function AdminMessageRecords({ data }: AdminMessageRecordsProps) {
     return `/admin?${query.toString()}`
   }
 
+  async function handleDeleteReadSystemNotifications() {
+    if (isDeletingReadSystemNotifications) {
+      return
+    }
+
+    const confirmed = window.confirm("确定删除所有成员已读的系统消息吗？未读系统消息不会被删除。")
+    if (!confirmed) {
+      return
+    }
+
+    setIsDeletingReadSystemNotifications(true)
+    setDeleteReadSystemNotificationsMessage("")
+
+    try {
+      const response = await fetch("/api/admin/notifications/read-system/delete", {
+        method: "POST",
+      })
+      const payload = await response.json().catch(() => null) as { message?: string; data?: { deletedCount?: number } } | null
+
+      if (!response.ok) {
+        setDeleteReadSystemNotificationsMessage(payload?.message ?? "删除失败，请稍后重试")
+        return
+      }
+
+      const deletedCount = payload?.data?.deletedCount ?? 0
+      setDeleteReadSystemNotificationsMessage(`已删除 ${formatNumber(deletedCount)} 条成员已读系统消息`)
+      router.refresh()
+    } finally {
+      setIsDeletingReadSystemNotifications(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <AdminFilterCard
@@ -191,6 +227,24 @@ export function AdminMessageRecords({ data }: AdminMessageRecordsProps) {
       </AdminFilterCard>
 
       <AdminSummaryStrip items={statCards} />
+
+      <Card>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle>系统消息清理</CardTitle>
+            <CardDescription>一键删除所有成员已经读过的系统通知，保留未读系统通知和回复、提及等互动通知。</CardDescription>
+          </div>
+          <Button type="button" variant="destructive" disabled={isDeletingReadSystemNotifications} onClick={handleDeleteReadSystemNotifications}>
+            <Trash2 data-icon="inline-start" />
+            {isDeletingReadSystemNotifications ? "删除中..." : "删除已读系统消息"}
+          </Button>
+        </CardHeader>
+        {deleteReadSystemNotificationsMessage ? (
+          <CardContent className="pt-0 text-sm text-muted-foreground">
+            {deleteReadSystemNotificationsMessage}
+          </CardContent>
+        ) : null}
+      </Card>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.85fr)_minmax(0,1.35fr)]">
         <ConversationListCard
