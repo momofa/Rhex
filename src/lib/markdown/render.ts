@@ -20,7 +20,7 @@ import { renderPostCardEmbedHtml } from "@/lib/post-card-embed"
 interface MarkdownHeadingToken {
   tag: string
   content?: string
-  attrs?: Array<[string, string]>
+  attrs?: MarkdownTokenAttrs
 }
 
 const CALLOUT_TYPES = ["info", "tip", "warning", "danger", "success"] as const
@@ -49,7 +49,7 @@ const LINK_CANDIDATE_PATTERN = new RegExp(
   "giu",
 )
 
-export const MARKDOWN_RENDER_OUTPUT_VERSION = "raw-html-sanitize-2026-06-12-image-flow"
+export const MARKDOWN_RENDER_OUTPUT_VERSION = "raw-html-sanitize-2026-06-12-image-flow-attrs-safe"
 
 type CalloutType = (typeof CALLOUT_TYPES)[number]
 const MARKDOWN_RENDERER_CACHE_LIMIT = 8
@@ -64,12 +64,15 @@ interface EscapedHtmlPlaceholder {
   html: string
 }
 
+type MarkdownTokenAttrTuple = [string, string]
+type MarkdownTokenAttrs = MarkdownTokenAttrTuple[] | Record<string, unknown>
+
 interface MarkdownToken {
   type: string
   tag: string
   nesting: number
   content: string
-  attrs: Array<[string, string]> | null
+  attrs: MarkdownTokenAttrs | null
   markup: string
   info: string
   level: number
@@ -132,10 +135,34 @@ function createTextToken(Token: MarkdownTokenConstructor, content: string, level
   return token
 }
 
+function normalizeMarkdownTokenAttrs(attrs: MarkdownTokenAttrs | null | undefined): MarkdownTokenAttrTuple[] | null {
+  if (!attrs) {
+    return null
+  }
+
+  const nextAttrs: MarkdownTokenAttrTuple[] = []
+
+  if (Array.isArray(attrs)) {
+    for (const item of attrs) {
+      if (!Array.isArray(item) || item.length < 2 || typeof item[0] !== "string") {
+        continue
+      }
+
+      nextAttrs.push([item[0], String(item[1] ?? "")])
+    }
+  } else {
+    for (const [name, value] of Object.entries(attrs)) {
+      nextAttrs.push([name, String(value ?? "")])
+    }
+  }
+
+  return nextAttrs.length > 0 ? nextAttrs : null
+}
+
 function cloneMarkdownToken(Token: MarkdownTokenConstructor, token: MarkdownToken) {
   const nextToken = new Token(token.type, token.tag, token.nesting)
   nextToken.content = token.content
-  nextToken.attrs = token.attrs ? token.attrs.map(([name, value]) => [name, value]) : null
+  nextToken.attrs = normalizeMarkdownTokenAttrs(token.attrs)
   nextToken.markup = token.markup
   nextToken.info = token.info
   nextToken.level = token.level
@@ -497,8 +524,8 @@ function fixCjkAutoLinkBoundaries(markdown: MarkdownItWithLinkifyCore) {
   })
 }
 
-function upsertAttribute(attrs: Array<[string, string]> | undefined, name: string, value: string) {
-  const nextAttrs = [...(attrs ?? [])]
+function upsertAttribute(attrs: MarkdownTokenAttrs | null | undefined, name: string, value: string) {
+  const nextAttrs = normalizeMarkdownTokenAttrs(attrs) ?? []
   const index = nextAttrs.findIndex(([attrName]) => attrName === name)
 
   if (index >= 0) {

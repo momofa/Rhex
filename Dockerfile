@@ -1,4 +1,5 @@
 ARG NEXT_ASSET_PREFIX="https://rhex-runtime-asset-prefix.invalid"
+ARG NEXT_DEPLOYMENT_ID
 
 FROM node:20-bookworm-slim AS base
 
@@ -17,7 +18,9 @@ WORKDIR /app
 FROM base AS builder
 
 ARG NEXT_ASSET_PREFIX
+ARG NEXT_DEPLOYMENT_ID
 ENV NEXT_ASSET_PREFIX=${NEXT_ASSET_PREFIX}
+ENV NEXT_DEPLOYMENT_ID=${NEXT_DEPLOYMENT_ID}
 
 RUN mkdir -p addons
 

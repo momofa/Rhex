@@ -15,10 +15,15 @@ const normalizeAssetPrefix = (value) => {
 const assetPrefix = isProductionBuild
   ? normalizeAssetPrefix(process.env.NEXT_ASSET_PREFIX)
   : undefined
+const deploymentId = process.env.NEXT_DEPLOYMENT_ID?.trim() || process.env.GITHUB_SHA?.trim() || undefined
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   assetPrefix,
+  ...(deploymentId ? {
+    deploymentId,
+    generateBuildId: async () => deploymentId,
+  } : {}),
   reactStrictMode: true,
   productionBrowserSourceMaps:false,
   typescript: {
