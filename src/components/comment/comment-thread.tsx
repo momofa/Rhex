@@ -161,23 +161,7 @@ function scrollCommentAnchorIntoView(target: HTMLElement, behavior: ScrollBehavi
   return false
 }
 
-function getCommentThreadStateKey({
-  threadId,
-  comments,
-  flatComments = [],
-  currentPage,
-  pageSize,
-  total,
-  canAcceptAnswer = false,
-}: CommentThreadProps) {
-  return JSON.stringify([threadId, comments, flatComments, currentPage, pageSize, total, canAcceptAnswer])
-}
-
-export function CommentThread(props: CommentThreadProps) {
-  return <CommentThreadContent key={getCommentThreadStateKey(props)} {...props} />
-}
-
-function CommentThreadContent({ threadId, comments, flatComments = [], postId, postPath, pointName, tipping, canReply, currentPage, pageSize, total, currentSort, currentDisplayMode, commentLoadMode = COMMENT_LOAD_MODE_PAGINATION, currentUserId, canAcceptAnswer = false, commentsVisibleToAuthorOnly = false, canOfflineOwnComment = false, canOfflineUserComment = false, anonymousReplyEnabled = false, anonymousReplyDefaultChecked = false, anonymousReplySwitchVisible = false, isAdmin = false, adminRole = null, canPinComment = false, markdownEmojiMap, commentEditWindowMinutes = 5, initialVisibleReplies = 10 }: CommentThreadProps) {
+export function CommentThread({ threadId, comments, flatComments = [], postId, postPath, pointName, tipping, canReply, currentPage, pageSize, total, currentSort, currentDisplayMode, commentLoadMode = COMMENT_LOAD_MODE_PAGINATION, currentUserId, canAcceptAnswer = false, commentsVisibleToAuthorOnly = false, canOfflineOwnComment = false, canOfflineUserComment = false, anonymousReplyEnabled = false, anonymousReplyDefaultChecked = false, anonymousReplySwitchVisible = false, isAdmin = false, adminRole = null, canPinComment = false, markdownEmojiMap, commentEditWindowMinutes = 5, initialVisibleReplies = 10 }: CommentThreadProps) {
   const pathname = usePathname()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -205,6 +189,26 @@ function CommentThreadContent({ threadId, comments, flatComments = [], postId, p
   const replyBoxContainerRef = useRef<HTMLDivElement | null>(null)
   const replyBoxFollowRafRef = useRef<number | null>(null)
   const infiniteSentinelRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    setLocalComments(comments)
+  }, [comments])
+
+  useEffect(() => {
+    setLocalFlatComments(flatComments)
+  }, [flatComments])
+
+  useEffect(() => {
+    setLocalTotal(total)
+    setLoadedPage(currentPage)
+    setHasNextInfinitePage(currentPage * pageSize < total)
+    setIsLoadingMoreComments(false)
+    setLoadMoreError("")
+  }, [currentPage, pageSize, total])
+
+  useEffect(() => {
+    setCanAcceptAnswerState(canAcceptAnswer)
+  }, [canAcceptAnswer])
 
   const filteredComments = useMemo(() => {
     if (!showOnlyAuthorComments) {
@@ -348,14 +352,11 @@ function CommentThreadContent({ threadId, comments, flatComments = [], postId, p
   }, [currentDisplayMode, findRootCommentByCommentId, initialVisibleReplies])
 
   const triggerCommentHighlight = useCallback((commentId: string) => {
+    setHighlightedCommentId(null)
     window.requestAnimationFrame(() => {
-      ensureHighlightedCommentVisible(commentId)
-      setHighlightedCommentId(null)
-      window.requestAnimationFrame(() => {
-        setHighlightedCommentId(commentId)
-      })
+      setHighlightedCommentId(commentId)
     })
-  }, [ensureHighlightedCommentVisible])
+  }, [])
 
   const clearCommentHighlightSearchParam = useCallback((commentId: string) => {
     const currentUrl = new URL(window.location.href)
@@ -397,6 +398,8 @@ function CommentThreadContent({ threadId, comments, flatComments = [], postId, p
     if (!highlightedCommentId) {
       return
     }
+
+    ensureHighlightedCommentVisible(highlightedCommentId)
 
     let cancelled = false
     let rafId: number | null = null

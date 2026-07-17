@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 import { AdminBoardApplicationSettingsForm } from "@/components/admin/admin-board-application-settings-form"
 import {
@@ -33,18 +33,16 @@ export function AdminBasicSettingsForm({
   initialInviteCodePage,
 }: AdminBasicSettingsFormProps) {
   const [draft, setDraft] = useState(() => createAdminBasicSettingsDraft(initialSettings))
-  const initialActiveSubTab = resolveInternalSettingTab(mode, initialSubTab)
-  const activeSubTabContext = `${mode}:${initialSubTab ?? ""}`
-  const [activeSubTabSelection, setActiveSubTabSelection] = useState(() => ({
-    context: activeSubTabContext,
-    value: initialActiveSubTab,
-  }))
-  const activeSubTab = activeSubTabSelection.context === activeSubTabContext
-    ? activeSubTabSelection.value
-    : initialActiveSubTab
+  const [activeSubTab, setActiveSubTab] = useState(() =>
+    resolveInternalSettingTab(mode, initialSubTab),
+  )
   const { isPending, runMutation } = useAdminMutation()
   const { isPending: isClearingCache, runMutation: runCacheMutation } =
     useAdminMutation()
+
+  useEffect(() => {
+    setActiveSubTab(resolveInternalSettingTab(mode, initialSubTab))
+  }, [initialSubTab, mode])
 
   const updateDraftField: UpdateAdminBasicSettingsDraftField = (field, value) => {
     setDraft((current) => ({ ...current, [field]: value }))
@@ -86,7 +84,7 @@ export function AdminBasicSettingsForm({
             items={INTERNAL_SETTING_TABS[mode].map((tab) => ({
               key: tab.key,
               label: tab.label,
-              onSelect: () => setActiveSubTabSelection({ context: activeSubTabContext, value: tab.key }),
+              onSelect: () => setActiveSubTab(tab.key),
             }))}
             activeKey={activeSubTab}
           />

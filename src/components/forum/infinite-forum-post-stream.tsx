@@ -25,14 +25,7 @@ interface PostStreamApiPayload {
   hasNextPage: boolean
 }
 
-export function InfiniteForumPostStream(props: InfiniteForumPostStreamProps) {
-  const { initialItems, initialPage, initialHasNextPage, apiPath } = props
-  const streamKey = `${apiPath}:${initialPage}:${initialHasNextPage}:${JSON.stringify(initialItems)}`
-
-  return <InfiniteForumPostStreamContent key={streamKey} {...props} />
-}
-
-function InfiniteForumPostStreamContent({
+export function InfiniteForumPostStream({
   apiPath,
   initialItems,
   initialPage,
@@ -96,6 +89,16 @@ function InfiniteForumPostStreamContent({
       setIsLoading(false)
     }
   }, [apiPath])
+
+  useEffect(() => {
+    pageRef.current = initialPage
+    hasNextPageRef.current = initialHasNextPage
+    isLoadingRef.current = false
+    setItems(initialItems)
+    setHasNextPage(initialHasNextPage)
+    setIsLoading(false)
+    setError("")
+  }, [apiPath, initialHasNextPage, initialItems, initialPage])
 
   useEffect(() => {
     if (!hasNextPage || !sentinelRef.current) {
