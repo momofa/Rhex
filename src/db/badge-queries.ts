@@ -259,12 +259,8 @@ export function createGrantedUserBadge(input: {
   })
 }
 
-export function findUserBadgeWithBadge(
-  userId: number,
-  badgeId: string,
-  client: Prisma.TransactionClient | typeof prisma = prisma,
-) {
-  return client.userBadge.findUnique({
+export function findUserBadgeWithBadge(userId: number, badgeId: string) {
+  return prisma.userBadge.findUnique({
     where: {
       userId_badgeId: {
         userId,
@@ -277,12 +273,8 @@ export function findUserBadgeWithBadge(
   })
 }
 
-export function updateUserBadgeDisplayById(
-  id: string,
-  input: { isDisplayed: boolean; displayOrder: number },
-  client: Prisma.TransactionClient | typeof prisma = prisma,
-) {
-  return client.userBadge.update({
+export function updateUserBadgeDisplayById(id: string, input: { isDisplayed: boolean; displayOrder: number }) {
+  return prisma.userBadge.update({
     where: { id },
     data: {
       isDisplayed: input.isDisplayed,
@@ -291,11 +283,8 @@ export function updateUserBadgeDisplayById(
   })
 }
 
-export function findDisplayedUserBadges(
-  userId: number,
-  client: Prisma.TransactionClient | typeof prisma = prisma,
-) {
-  return client.userBadge.findMany({
+export function findDisplayedUserBadges(userId: number) {
+  return prisma.userBadge.findMany({
     where: {
       userId,
       isDisplayed: true,
@@ -319,15 +308,6 @@ export function runBadgeTransaction<T>(
   callback: (tx: Prisma.TransactionClient) => Promise<T>,
 ) {
   return prisma.$transaction(callback)
-}
-
-export function lockUserBadgeDisplayState(tx: Prisma.TransactionClient, userId: number) {
-  return tx.$executeRaw(Prisma.sql`
-    SELECT pg_advisory_xact_lock(
-      hashtext('badge-display-state'),
-      hashtext(${String(userId)})
-    )
-  `)
 }
 
 export async function findDisplayedBadgeEffectRules(userId: number) {
