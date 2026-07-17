@@ -7,6 +7,9 @@ on:
       - master
     tags:
       - "v*"
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -54,6 +57,7 @@ jobs:
   publish:
     name: Build and publish image
     needs: quality
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
 
     steps:
@@ -74,13 +78,13 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/lovedevpanda/rhex
+          images: ghcr.io/momofa/rhex
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=ref,event=tag
             type=sha
           labels: |
-            org.opencontainers.image.source=https://github.com/lovedevpanda/Rhex
+            org.opencontainers.image.source=https://github.com/momofa/Rhex
 
       - name: Build and push image
         uses: docker/build-push-action@v6

@@ -1,6 +1,7 @@
 import { Prisma, type PrismaClient } from "@prisma/client"
 
 import { prisma } from "@/db/client"
+import { recalculatePostScore } from "@/db/post-score-queries"
 import { userIdentityWithAvatarSelect } from "@/db/user-selects"
 
 type PostTipQueryClient = Prisma.TransactionClient | PrismaClient
@@ -238,6 +239,9 @@ export function incrementPostTipTotals(
         increment: params.amount,
       },
     },
+  }).then(async (post) => {
+    await recalculatePostScore(params.postId, client)
+    return post
   })
 }
 

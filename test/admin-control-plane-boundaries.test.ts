@@ -105,6 +105,15 @@ test("structure moderator controls cannot alter self or administrator scope gran
   assert.match(source, /await deleteModeratorTargetScope[\s\S]*?await invalidateUserSessions\(moderatorId\)/)
 })
 
+test("board list settings can be cleared to inherit from their zone", async () => {
+  const source = await readSource("src/lib/admin-structure-service.ts")
+
+  assert.match(source, /postListDisplayMode: "postListDisplayMode" in body[\s\S]*?normalizeNullablePostListDisplayMode/)
+  assert.match(source, /postListLoadMode: "postListLoadMode" in body[\s\S]*?normalizeNullablePostListLoadMode/)
+  assert.doesNotMatch(source, /normalizeNullablePostListDisplayMode\(body\.postListDisplayMode\) \?\? undefined/)
+  assert.doesNotMatch(source, /normalizeNullablePostListLoadMode\(body\.postListLoadMode\) \?\? undefined/)
+})
+
 test("content bulk routes apply their limits to raw input and reject malformed or duplicate IDs", async () => {
   for (const [file, field] of [
     ["src/app/api/admin/posts/bulk/route.ts", "postIds"],
