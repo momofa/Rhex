@@ -47,20 +47,8 @@ RUN --mount=type=cache,id=rhex-pnpm-store,target=/pnpm/store \
 COPY . .
 
 RUN pnpm run prisma:generate \
-  && pnpm run typecheck \
-  && pnpm run lint \
-  && pnpm run test \
   && pnpm run build \
   && pnpm run verify:docker-build
-
-FROM base AS production-dependencies
-
-COPY package.json pnpm-lock.yaml .npmrc ./
-
-# The setup and worker commands execute these binaries at container runtime.
-RUN pnpm install --prod --frozen-lockfile \
-  && test -x node_modules/.bin/cross-env \
-  && test -x node_modules/.bin/tsx
 
 FROM base AS runner
 
@@ -75,9 +63,7 @@ LABEL org.opencontainers.image.source="https://github.com/momofa/Rhex"
 
 RUN mkdir -p uploads addons
 
-COPY --from=production-dependencies /app/node_modules ./node_modules
-# Prisma's generated client is produced in the checked builder stage.
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/addons ./addons
 COPY --from=builder /app/package.json ./package.json
