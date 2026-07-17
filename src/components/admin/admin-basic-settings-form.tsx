@@ -30,7 +30,7 @@ export function AdminBasicSettingsForm({
   mode = "profile",
   initialSubTab,
   subTabRouteSection,
-  initialInviteCodes = [],
+  initialInviteCodePage,
 }: AdminBasicSettingsFormProps) {
   const [draft, setDraft] = useState(() => createAdminBasicSettingsDraft(initialSettings))
   const initialActiveSubTab = resolveInternalSettingTab(mode, initialSubTab)
@@ -98,7 +98,7 @@ export function AdminBasicSettingsForm({
         activeSubTab={activeSubTab}
         draft={draft}
         updateDraftField={updateDraftField}
-        initialInviteCodes={initialInviteCodes}
+        initialInviteCodePage={initialInviteCodePage}
       />
 
       <div className="flex flex-wrap items-center gap-3">
@@ -137,13 +137,13 @@ function ModeSection({
   activeSubTab,
   draft,
   updateDraftField,
-  initialInviteCodes,
+  initialInviteCodePage,
 }: {
   mode: AdminBasicSettingsMode
   activeSubTab: string
   draft: AdminBasicSettingsDraft
   updateDraftField: UpdateAdminBasicSettingsDraftField
-  initialInviteCodes: AdminBasicSettingsFormProps["initialInviteCodes"]
+  initialInviteCodePage: AdminBasicSettingsFormProps["initialInviteCodePage"]
 }) {
   if (mode === "profile") {
     return (
@@ -161,7 +161,7 @@ function ModeSection({
         activeSubTab={activeSubTab}
         draft={draft}
         updateDraftField={updateDraftField}
-        initialInviteCodes={initialInviteCodes ?? []}
+        initialInviteCodePage={initialInviteCodePage}
       />
     )
   }

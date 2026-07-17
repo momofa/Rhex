@@ -165,7 +165,7 @@ export function AdminRegistrationSettingsForm({
   activeSubTab,
   draft,
   updateDraftField,
-  initialInviteCodes,
+  initialInviteCodePage,
 }: AdminRegistrationSettingsFormProps) {
   const [authDocOpen, setAuthDocOpen] = useState(false)
   const siteOrigin = useSyncExternalStore(
@@ -299,7 +299,7 @@ export function AdminRegistrationSettingsForm({
         </div>
       ) : null}
 
-      {activeSubTab === "invite-codes" ? <AdminInviteCodeManager initialInviteCodes={initialInviteCodes} /> : null}
+      {activeSubTab === "invite-codes" ? <AdminInviteCodeManager initialInviteCodePage={initialInviteCodePage} /> : null}
 
       {activeSubTab === "fields" ? (
         <div className="rounded-xl border border-border p-5 space-y-4">

@@ -105,7 +105,7 @@ function InfiniteForumFeedContent({
   }, [hasNextPage, loadMore])
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-infinite-post-stream>
       <ForumFeedView
         items={items}
         listDisplayMode={listDisplayMode}
