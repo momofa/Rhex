@@ -4,6 +4,7 @@
 
 ## 固定规则
 
+- 正式发布目标仓库固定为 [`momofa/rhex`](https://github.com/momofa/rhex)，不得发布到 `momofa/rhex-custom` 或其他仓库。
 - 正式发布统一推送到 GitHub `main` 分支。
 - Docker 镜像统一由 `.github/workflows/publish-image.yml` 中的 `Publish Docker Image` 构建并推送。
 - 每次正式发布必须同时生成：
@@ -70,6 +71,26 @@ git rev-parse --short=7 HEAD
 
 ## 4. 推送 GitHub main
 
+推送前必须核对远端仓库：
+
+```bash
+git remote get-url origin
+```
+
+结果必须为：
+
+```txt
+https://github.com/momofa/rhex.git
+```
+
+如果不是，先修正远端：
+
+```bash
+git remote set-url origin https://github.com/momofa/rhex.git
+```
+
+确认无误后再推送：
+
 ```bash
 git push origin HEAD:main
 ```
@@ -80,7 +101,7 @@ git push origin HEAD:main
 
 ## 5. 确认 GitHub Actions 成功
 
-推送后打开 [Publish Docker Image](https://github.com/momofa/Rhex/actions/workflows/publish-image.yml)，确认：
+推送后打开 [Publish Docker Image](https://github.com/momofa/rhex/actions/workflows/publish-image.yml)，确认：
 
 1. 工作流对应的提交号与刚推送的提交一致。
 2. `Build and push image` 步骤成功。

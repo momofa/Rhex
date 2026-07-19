@@ -11,6 +11,7 @@
 
 ## Docker 镜像
 - 生产服务器默认按 `linux/amd64` 处理。
+- **正式发布目标仓库固定为 [`momofa/rhex`](https://github.com/momofa/rhex)**。发布前必须执行 `git remote get-url origin` 并确认结果为 `https://github.com/momofa/rhex.git`；不得将正式版本推送到 `momofa/rhex-custom` 或其他仓库。
 - **正式发布统一使用 GitHub Actions**：提交并推送到 `main` 后，由 `.github/workflows/publish-image.yml` 在 GitHub 的 `ubuntu-latest` 环境构建并推送 GHCR；不要将日常发布改回本机构建推送。
 - 每次推送 `main` 都必须更新 `ghcr.io/momofa/rhex:latest`，并同时发布不可变的提交标签（例如 `ghcr.io/momofa/rhex:sha-e7ca3cc`），用于追溯与回滚；不要依赖 GitHub 仓库的默认分支判断 `latest`。
 - 正式发布流程为：本地验证 → `git commit` → `git push origin main` → 确认 `Publish Docker Image` 成功 → 服务器拉取新镜像并重启服务。
