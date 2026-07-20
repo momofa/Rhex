@@ -107,6 +107,7 @@ export function InfiniteForumPostStream({
     pageRef.current = initialPage
     hasNextPageRef.current = initialHasNextPage
     isLoadingRef.current = false
+    loadedIdsRef.current = new Set(initialItems.map((item) => item.id))
     setItems(initialItems)
     setHasNextPage(initialHasNextPage)
     setIsLoading(false)
